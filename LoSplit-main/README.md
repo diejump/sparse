@@ -31,3 +31,7 @@ If you find this repo helful, please cite our paper. Thank you.
   author={Jin, Di and Zhang, Yuxiang and Feng, Bingdao and Wang, Xiaobao and He, Dongxiao and Wang, Zhen},
   booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems}
 }
+
+## Local ABP integration and fixed-snapshot usage
+
+See [USAGE.md](USAGE.md) for GPU execution, fresh attack generation, fixed-snapshot prune/RIGBD, ABP, abp_dual, abp_assisted, and historical DPGBA replay. Integration details: [ABP_INTEGRATION.md](ABP_INTEGRATION.md).

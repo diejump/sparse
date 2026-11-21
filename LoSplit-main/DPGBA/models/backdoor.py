@@ -416,7 +416,9 @@ class Backdoor:
                 print("acc_train_clean: {:.4f}, ASR_train_attach: {:.4f}, ASR_train_outter: {:.4f}"\
                         .format(acc_train_clean,acc_train_attach,acc_train_outter))
         state_dict = self.trojan.state_dict()
-        torch.save(state_dict, 'model_weights.pth')
+
+        # torch.save(state_dict, 'model_weights.pth')
+        
         self.trojan.eval()
 
     def get_poisoned(self):

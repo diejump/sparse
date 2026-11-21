@@ -6,6 +6,8 @@
 
 
 import os
+from deterministic_runtime import prepare_environment
+prepare_environment()
 import imp
 import time
 import argparse
@@ -21,6 +23,7 @@ import scipy.sparse as sp
 from torch_geometric.utils import subgraph
 # Training settings
 parser = argparse.ArgumentParser()
+parser.add_argument('--deterministic', action='store_true', help='Strict deterministic runtime for audited Cora/GCN settings')
 parser.add_argument('--debug', action='store_true',
         default=True, help='debug mode')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -120,6 +123,12 @@ cuda_disabled = args.no_cuda or (
 )
 args.cuda = not cuda_disabled and torch.cuda.is_available()
 device = torch.device('cuda:{}'.format(args.device_id) if args.cuda else 'cpu')
+if args.deterministic:
+    if args.dataset != 'Cora' or args.test_model != 'GCN' or args.selection_method != 'none' or args.outter_size != 4096:
+        parser.error('Strict mode is audited for Cora/GCN, selection_method=none, outter_size=4096')
+    from deterministic_runtime import configure_determinism
+    configure_determinism(args.seed, args.cuda)
+
 
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)

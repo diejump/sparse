@@ -5,6 +5,8 @@
 
 
 import os
+from deterministic_runtime import prepare_environment
+prepare_environment()
 import imp
 import time
 import argparse
@@ -47,6 +49,17 @@ plt.rcParams['font.size'] = 25
 
 # Training settings
 parser = argparse.ArgumentParser()
+parser.add_argument('--deterministic', action='store_true', help='Strict deterministic runtime for audited Cora/GCN settings')
+parser.add_argument('--rigbd_k', type=int, default=20)
+parser.add_argument('--rigbd_b', type=float, default=0.5, help='Random edge drop ratio')
+parser.add_argument('--skip_rigbd', action='store_true', help='Evaluate only the selected graph defense')
+parser.add_argument('--model_save_path', type=str, default='')
+parser.add_argument('--abp_min_branch', type=int, default=2)
+parser.add_argument('--abp_recovery_epochs', type=int, default=400)
+parser.add_argument('--abp_negative_weight', type=float, default=3.0)
+parser.add_argument('--abp_teacher_hidden', type=int, default=32)
+parser.add_argument('--abp_teacher_epochs', type=int, default=200)
+parser.add_argument('--abp_confidence', type=float, default=0.8)
 parser.add_argument('--debug', action='store_true',
         default=False, help='debug mode')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -81,7 +94,7 @@ parser.add_argument('--vs_number', type=int, default=40,
                     help="ratio of poisoning nodes relative to the full graph")
 # defense setting
 parser.add_argument('--defense_mode', type=str, default="none",
-                    choices=['prune', 'isolate', 'none', 'reconstruct'],
+                    choices=['prune', 'isolate', 'none', 'reconstruct', 'abp','abp_dual','abp_assisted'],
                     help="Mode of defense")
 parser.add_argument('--prune_thr', type=float, default=0.8,
                     help="Threshold of prunning edges")
@@ -110,6 +123,10 @@ parser.add_argument('--trigger_generator_address', type=str, default='./weights/
 parser.add_argument('--pre_train_param', type=str, default='./weights/GTA/Cora/GTA_Cora_RIGBD.pt')
 # args = parser.parse_args()
 args = parser.parse_known_args()[0]
+if args.defense_mode in ('abp', 'abp_dual', 'abp_assisted'):
+    args.skip_rigbd = True
+if args.rigbd_k < 1 or not 0 <= args.rigbd_b <= 1:
+    parser.error('rigbd_k must be positive and rigbd_b must be in [0,1]')
 # CPU请求或显式隐藏GPU时，直接选择CPU，避免初始化CUDA运行时。
 cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')
 cuda_disabled = args.no_cuda or (
@@ -117,6 +134,12 @@ cuda_disabled = args.no_cuda or (
 )
 args.cuda = not cuda_disabled and torch.cuda.is_available()
 device = torch.device('cuda:{}'.format(args.device_id) if args.cuda else 'cpu')
+if args.deterministic:
+    if args.dataset != 'Cora' or args.test_model != 'GCN':
+        parser.error('Strict mode is currently audited for Cora/GCN')
+    from deterministic_runtime import configure_determinism
+    configure_determinism(args.seed, args.cuda)
+
 
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
@@ -219,6 +242,14 @@ model.trojan = GraphTrojanNet(device, poison_x.size(1), args.trigger_size, layer
 model.trojan.load_state_dict(poison_snapshot['trigger_generator_state'])
 model.trojan.eval()
 print('Loaded fixed poison snapshot:', args.pre_train_param)
+import hashlib
+with open(args.pre_train_param, 'rb') as snapshot_file:
+    print('SNAPSHOT_SHA256:', hashlib.sha256(snapshot_file.read()).hexdigest())
+external_generator_state = torch.load(args.trigger_generator_address, map_location='cpu')
+assert set(external_generator_state) == set(poison_snapshot['trigger_generator_state']), 'Generator keys differ from snapshot'
+assert all(torch.equal(external_generator_state[key].cpu(), poison_snapshot['trigger_generator_state'][key].cpu()) for key in external_generator_state), 'Generator differs from fixed snapshot'
+print('GENERATOR_MATCHES_SNAPSHOT: True')
+
 # ===== 原选点及训练图重建代码（已停用） =====
 # filter out the unlabeled nodes except from training nodes and testing nodes, nonzero() is to get index, flatten is to get 1-d tensor
 # unlabeled_idx = (torch.bitwise_not(data.test_mask)&torch.bitwise_not(data.train_mask)).nonzero().flatten()
@@ -251,7 +282,16 @@ print('Loaded fixed poison snapshot:', args.pre_train_param)
 
 
 # ===== 固定快照加载结束，继续作者原防御代码 =====
-if(args.defense_mode == 'prune'):
+if args.defense_mode == 'abp':
+    from models.ABP import filter_edges
+    # Keep the complete observed graph for the two separate evaluation projections.
+    abp_raw_train_edges = poison_edge_index
+    abp_raw_train_weights = poison_edge_weights
+    bkd_tn_nodes = torch.cat([idx_train, idx_attach]).to(device)
+    poison_edge_index, poison_edge_weights = filter_edges(
+        abp_raw_train_edges, abp_raw_train_weights, poison_x.size(0), bkd_tn_nodes)
+    print('ABP_TRAIN_ARCS:', abp_raw_train_edges.size(1), '->', poison_edge_index.size(1))
+elif(args.defense_mode == 'prune'):
     poison_edge_index,poison_edge_weights = prune_unrelated_edge(args,poison_edge_index,poison_edge_weights,poison_x,device,large_graph=False)
     bkd_tn_nodes = torch.cat([idx_train,idx_attach]).to(device)
 elif(args.defense_mode == 'reconstruct'):
@@ -315,8 +355,12 @@ print("precent of left attach nodes: {:.3f}"\
 
 
 # ===== 保留图处理防御所需的分类器训练与评估 =====
-if args.defense_mode != "none":
-    test_model = model_construct(args,args.test_model,data,device).to(device) 
+if args.defense_mode != "none" or args.skip_rigbd:
+    if args.defense_mode in ('abp_dual', 'abp_assisted'):
+        from models.ABP_Learning import ABPLearning
+        test_model = ABPLearning(args, args.test_model, data, device, tuple_output=False).to(device)
+    else:
+        test_model = model_construct(args,args.test_model,data,device).to(device) 
 
     if test_model == 'ABL':
         test_model.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val,train_iters=args.epochs,verbose=False, num_attach=len(idx_attach))
@@ -326,18 +370,26 @@ if args.defense_mode != "none":
     # test_model.fit(data.x, train_edge_index, None, data.y, idx_train, idx_val,train_iters=args.epochs,verbose=False)
     # test_model.fit(data.x, data.edge_index, data.edge_weight, data.y, idx_train, idx_val,train_iters=args.epochs,verbose=False) 
 
-
+    test_model.eval()
     output = test_model(poison_x, poison_edge_index, poison_edge_weights)
     induct_edge_index = torch.cat([poison_edge_index,mask_edge_index],dim=1)
     induct_edge_weights = torch.cat([poison_edge_weights,torch.ones([mask_edge_index.shape[1]],dtype=torch.float,device=device)])
 
     train_attach_rate = (output.argmax(dim=1)[idx_attach]==args.target_class).float().mean()
     print("target class rate on Vs: {:.4f}".format(train_attach_rate))
+    if args.defense_mode == 'abp':
+        abp_eval_raw_edges = torch.cat([abp_raw_train_edges, mask_edge_index], dim=1)
+        abp_eval_raw_weights = torch.cat([abp_raw_train_weights, poison_x.new_ones(mask_edge_index.size(1))])
+        induct_edge_index, induct_edge_weights = filter_edges(
+            abp_eval_raw_edges, abp_eval_raw_weights, poison_x.size(0), bkd_tn_nodes)
     clean_acc = test_model.test(poison_x,induct_edge_index,induct_edge_weights,data.y,idx_clean_test)
 
     print("accuracy on clean test nodes: {:.4f}".format(clean_acc))
 
 
+    if args.defense_mode == 'abp':
+        # Inject on the original observed evaluation graph, then project the full triggered graph.
+        induct_edge_index, induct_edge_weights = abp_eval_raw_edges, abp_eval_raw_weights
     induct_x, induct_edge_index,induct_edge_weights = model.inject_trigger(idx_atk,poison_x,induct_edge_index,induct_edge_weights,device)
     induct_x, induct_edge_index,induct_edge_weights = induct_x.clone().detach(), induct_edge_index.clone().detach(),induct_edge_weights.clone().detach()
     # output = test_model(induct_x,induct_edge_index,induct_edge_weights)
@@ -345,6 +397,9 @@ if args.defense_mode != "none":
     print("target class rate on Vs: {:.4f}".format(train_attach_rate))
     if(args.defense_mode == 'prune' or args.defense_mode == 'isolate'):
         induct_edge_index,induct_edge_weights = prune_unrelated_edge(args,induct_edge_index,induct_edge_weights,induct_x,device)
+    elif args.defense_mode == 'abp':
+        induct_edge_index, induct_edge_weights = filter_edges(
+            induct_edge_index, induct_edge_weights, induct_x.size(0), bkd_tn_nodes)
 
     output = test_model(induct_x,induct_edge_index,induct_edge_weights)
 
@@ -360,6 +415,16 @@ if args.defense_mode != "none":
 
 
 
+if args.skip_rigbd:
+    if args.model_save_path:
+        torch.save(test_model.state_dict(), args.model_save_path)
+        if hasattr(test_model, 'defense_metadata'):
+            import json
+            with open(args.model_save_path + '.meta.json', 'w', encoding='utf-8') as metadata_file:
+                json.dump(test_model.defense_metadata, metadata_file, ensure_ascii=False, indent=2)
+    print('FINAL_DEFENSE_RESULT method={} CA={:.9f} ASR={:.9f}'.format(args.defense_mode, float(clean_acc), float(flip_asr)))
+    raise SystemExit(0)
+
 # RIGBD Defense
 test_model = model_construct(args,args.test_model,data,device,add_self_loops=False).to(device) 
 test_model.fit(poison_x,poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val,train_iters=args.epochs,verbose=False)
@@ -369,8 +434,8 @@ output = test_model(poison_x, poison_edge_index, poison_edge_weights)
 ori_predict = torch.exp(output[known_nodes])
 # print("accuracy on poisoned target nodes: {:.4f}".format(clean_acc))
 
-K_list = [10, 20, 25, 50]
-drop_ratio_list = [0.3, 0.5, 0.7, 0.9]
+K_list = [args.rigbd_k]
+drop_ratio_list = [args.rigbd_b]
 results = {}
 
 for drop_ratio in drop_ratio_list:
@@ -511,3 +576,8 @@ for drop_ratio in drop_ratio_list:
                 f"Precision: {value['Precision']:.6f}, "
                 f"Recall: {value['Recall']:.6f}, "
                 f"FPR: {value['FPR']:.6f}")
+
+
+if args.model_save_path:
+    torch.save(test_model.state_dict(), args.model_save_path)
+print('FINAL_RIGBD_RESULT K={} b={} CA={:.9f} ASR={:.9f} Precision={:.9f} Recall={:.9f} FPR={:.9f}'.format(args.rigbd_k, args.rigbd_b, float(clean_acc), float(flip_asr), precision, recall, fpr))

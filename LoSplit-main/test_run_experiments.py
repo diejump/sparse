@@ -1,5 +1,6 @@
 """Launcher report checks without importing torch or running training."""
 import contextlib
+from argparse import Namespace
 import io
 from pathlib import Path
 import tempfile
@@ -10,6 +11,13 @@ import run_experiments as runner
 
 
 class ReportTests(unittest.TestCase):
+    def test_dpgba_classifier_learning_rates_match(self):
+        args = Namespace(stage='all', attacks=['DPGBA'], methods=['none'], seed=10,
+                         attack_root='runs/test_inputs', defense_root='runs/test_outputs')
+        jobs = runner.build_jobs(args)
+        rates = [[flag for flag in job[2] if flag.startswith('--train_lr=')] for job in jobs]
+        self.assertEqual(rates, [['--train_lr=0.015'], ['--train_lr=0.015']])
+
     def test_final_markers_and_attack_formats(self):
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "task.log"

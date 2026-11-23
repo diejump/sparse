@@ -1,0 +1,1019 @@
+[
+  {
+    "path": "runs\\my_cora_attacks\\GTA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "classifier_seed",
+      "classifier_train_lr",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2828,
+      1433
+    ],
+    "train": 581,
+    "val": 270,
+    "attach": 40,
+    "positive_arcs": 6978,
+    "stored_arcs": 6978,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 675.965576171875,
+          "q05": 680.3042297363281,
+          "median": 910.2379760742188,
+          "q95": 943.8474853515625,
+          "max": 945.9017333984375
+        },
+        "negative_fraction": {
+          "min": 0.48918354511260986,
+          "q05": 0.4933007791638374,
+          "median": 0.49965107440948486,
+          "q95": 0.5687369108200073,
+          "max": 0.5687369108200073
+        },
+        "norm": {
+          "min": 1.779426606063339e-09,
+          "q05": 2.1903442504189742e-09,
+          "median": 2.6778769202095987e-09,
+          "q95": 217.2024269104004,
+          "max": 346.58709716796875
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 126,
+      "tp": 40,
+      "precision": 0.31746031746031744,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 21,
+      "tp": 2,
+      "precision": 0.09523809523809523,
+      "recall": 0.05
+    },
+    "attach_branch_histogram": {
+      "1": 38,
+      "3": 2
+    }
+  },
+  {
+    "path": "runs\\my_cora_attacks\\UGBA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "classifier_seed",
+      "classifier_train_lr",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2828,
+      1433
+    ],
+    "train": 581,
+    "val": 270,
+    "attach": 40,
+    "positive_arcs": 6978,
+    "stored_arcs": 6978,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 267.31158447265625,
+          "q05": 324.5419891357422,
+          "median": 942.8771667480469,
+          "q95": 964.8634216308594,
+          "max": 969.6159057617188
+        },
+        "negative_fraction": {
+          "min": 0.35799023509025574,
+          "q05": 0.37745986729860304,
+          "median": 0.4860432595014572,
+          "q95": 0.5129448980093002,
+          "max": 0.5177948474884033
+        },
+        "norm": {
+          "min": 2.657835285191368e-09,
+          "q05": 2.7412963121697944e-09,
+          "median": 2.9889729580290236e-09,
+          "q95": 1.8068496584892273,
+          "max": 3.0518457889556885
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 121,
+      "tp": 40,
+      "precision": 0.3305785123966942,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 19,
+      "tp": 0,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    "attach_branch_histogram": {
+      "1": 40
+    }
+  },
+  {
+    "path": "runs\\my_cora_attacks\\DPGBA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "classifier_seed",
+      "classifier_train_lr",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2834,
+      1433
+    ],
+    "train": 583,
+    "val": 270,
+    "attach": 42,
+    "positive_arcs": 7150,
+    "stored_arcs": 7234,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 1433.0,
+          "q05": 1433.0,
+          "median": 1433.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 830.2434692382812,
+          "q05": 830.2856750488281,
+          "median": 834.63623046875,
+          "q95": 834.7769012451172,
+          "max": 834.8723754882812
+        },
+        "negative_fraction": {
+          "min": 0.506629467010498,
+          "q05": 0.5073272585868835,
+          "median": 0.5073272585868835,
+          "q95": 0.5143056511878967,
+          "max": 0.5143056511878967
+        },
+        "norm": {
+          "min": 4653.46728515625,
+          "q05": 4787.391845703125,
+          "median": 5053.40234375,
+          "q95": 5216.876220703125,
+          "max": 5325.81787109375
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 128,
+      "tp": 42,
+      "precision": 0.328125,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 61,
+      "tp": 42,
+      "precision": 0.6885245901639344,
+      "recall": 1.0
+    },
+    "attach_branch_histogram": {
+      "3": 42
+    }
+  },
+  {
+    "path": "runs\\my_cora_attacks1\\GTA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2828,
+      1433
+    ],
+    "train": 581,
+    "val": 270,
+    "attach": 40,
+    "positive_arcs": 6978,
+    "stored_arcs": 6978,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 675.965576171875,
+          "q05": 680.3042297363281,
+          "median": 910.2379760742188,
+          "q95": 943.8474853515625,
+          "max": 945.9017333984375
+        },
+        "negative_fraction": {
+          "min": 0.48918354511260986,
+          "q05": 0.4933007791638374,
+          "median": 0.49965107440948486,
+          "q95": 0.5687369108200073,
+          "max": 0.5687369108200073
+        },
+        "norm": {
+          "min": 1.779426606063339e-09,
+          "q05": 2.1903442504189742e-09,
+          "median": 2.6778769202095987e-09,
+          "q95": 217.2024269104004,
+          "max": 346.58709716796875
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 126,
+      "tp": 40,
+      "precision": 0.31746031746031744,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 21,
+      "tp": 2,
+      "precision": 0.09523809523809523,
+      "recall": 0.05
+    },
+    "attach_branch_histogram": {
+      "1": 38,
+      "3": 2
+    }
+  },
+  {
+    "path": "runs\\my_cora_attacks1\\UGBA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2828,
+      1433
+    ],
+    "train": 581,
+    "val": 270,
+    "attach": 40,
+    "positive_arcs": 6978,
+    "stored_arcs": 6978,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 267.31158447265625,
+          "q05": 324.5419891357422,
+          "median": 942.8771667480469,
+          "q95": 964.8634216308594,
+          "max": 969.6159057617188
+        },
+        "negative_fraction": {
+          "min": 0.35799023509025574,
+          "q05": 0.37745986729860304,
+          "median": 0.4860432595014572,
+          "q95": 0.5129448980093002,
+          "max": 0.5177948474884033
+        },
+        "norm": {
+          "min": 2.657835285191368e-09,
+          "q05": 2.7412963121697944e-09,
+          "median": 2.9889729580290236e-09,
+          "q95": 1.8068496584892273,
+          "max": 3.0518457889556885
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 121,
+      "tp": 40,
+      "precision": 0.3305785123966942,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 19,
+      "tp": 0,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    "attach_branch_histogram": {
+      "1": 40
+    }
+  },
+  {
+    "path": "runs\\my_cora_attacks1\\DPGBA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2834,
+      1433
+    ],
+    "train": 583,
+    "val": 270,
+    "attach": 42,
+    "positive_arcs": 7150,
+    "stored_arcs": 7234,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 1433.0,
+          "q05": 1433.0,
+          "median": 1433.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 830.2434692382812,
+          "q05": 830.2856750488281,
+          "median": 834.63623046875,
+          "q95": 834.7769012451172,
+          "max": 834.8723754882812
+        },
+        "negative_fraction": {
+          "min": 0.506629467010498,
+          "q05": 0.5073272585868835,
+          "median": 0.5073272585868835,
+          "q95": 0.5143056511878967,
+          "max": 0.5143056511878967
+        },
+        "norm": {
+          "min": 4653.46728515625,
+          "q05": 4787.391845703125,
+          "median": 5053.40234375,
+          "q95": 5216.876220703125,
+          "max": 5325.81787109375
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 128,
+      "tp": 42,
+      "precision": 0.328125,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 61,
+      "tp": 42,
+      "precision": 0.6885245901639344,
+      "recall": 1.0
+    },
+    "attach_branch_histogram": {
+      "3": 42
+    }
+  },
+  {
+    "path": "runs\\my_cora_attacks2\\GTA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2828,
+      1433
+    ],
+    "train": 581,
+    "val": 270,
+    "attach": 40,
+    "positive_arcs": 6978,
+    "stored_arcs": 6978,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 675.965576171875,
+          "q05": 680.3042297363281,
+          "median": 910.2379760742188,
+          "q95": 943.8474853515625,
+          "max": 945.9017333984375
+        },
+        "negative_fraction": {
+          "min": 0.48918354511260986,
+          "q05": 0.4933007791638374,
+          "median": 0.49965107440948486,
+          "q95": 0.5687369108200073,
+          "max": 0.5687369108200073
+        },
+        "norm": {
+          "min": 1.779426606063339e-09,
+          "q05": 2.1903442504189742e-09,
+          "median": 2.6778769202095987e-09,
+          "q95": 217.2024269104004,
+          "max": 346.58709716796875
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 126,
+      "tp": 40,
+      "precision": 0.31746031746031744,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 21,
+      "tp": 2,
+      "precision": 0.09523809523809523,
+      "recall": 0.05
+    },
+    "attach_branch_histogram": {
+      "1": 38,
+      "3": 2
+    }
+  },
+  {
+    "path": "runs\\my_cora_attacks2\\UGBA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2828,
+      1433
+    ],
+    "train": 581,
+    "val": 270,
+    "attach": 40,
+    "positive_arcs": 6978,
+    "stored_arcs": 6978,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 267.31158447265625,
+          "q05": 324.5419891357422,
+          "median": 942.8771667480469,
+          "q95": 964.8634216308594,
+          "max": 969.6159057617188
+        },
+        "negative_fraction": {
+          "min": 0.35799023509025574,
+          "q05": 0.37745986729860304,
+          "median": 0.4860432595014572,
+          "q95": 0.5129448980093002,
+          "max": 0.5177948474884033
+        },
+        "norm": {
+          "min": 2.657835285191368e-09,
+          "q05": 2.7412963121697944e-09,
+          "median": 2.9889729580290236e-09,
+          "q95": 1.8068496584892273,
+          "max": 3.0518457889556885
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 121,
+      "tp": 40,
+      "precision": 0.3305785123966942,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 19,
+      "tp": 0,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    "attach_branch_histogram": {
+      "1": 40
+    }
+  },
+  {
+    "path": "runs\\my_cora_attacks2\\DPGBA\\poison.pt",
+    "keys": [
+      "snapshot_version",
+      "dataset",
+      "attack",
+      "generation_seed",
+      "source_defense_mode",
+      "target_class",
+      "trigger_size",
+      "trigger_threshold",
+      "poison_x",
+      "poison_edge_index",
+      "poison_edge_weights",
+      "poison_labels",
+      "idx_train",
+      "idx_attach",
+      "idx_val",
+      "idx_clean_test",
+      "idx_atk",
+      "mask_edge_index",
+      "original_labels",
+      "num_original_nodes",
+      "trigger_generator_state"
+    ],
+    "shape": [
+      2834,
+      1433
+    ],
+    "train": 583,
+    "val": 270,
+    "attach": 42,
+    "positive_arcs": 7150,
+    "stored_arcs": 7234,
+    "features": {
+      "original": {
+        "support_1e-6": {
+          "min": 1.0,
+          "q05": 5.0,
+          "median": 20.0,
+          "q95": 25.0,
+          "max": 30.0
+        },
+        "effective_support": {
+          "min": 1.0,
+          "q05": 4.999999523162842,
+          "median": 19.999998092651367,
+          "q95": 24.9999942779541,
+          "max": 30.0000057220459
+        },
+        "negative_fraction": {
+          "min": 0.0,
+          "q05": 0.0,
+          "median": 0.0,
+          "q95": 0.0,
+          "max": 0.0
+        },
+        "norm": {
+          "min": 0.18257419764995575,
+          "q05": 0.20000000298023224,
+          "median": 0.22360680997371674,
+          "q95": 0.44721361994743347,
+          "max": 1.0
+        }
+      },
+      "new": {
+        "support_1e-6": {
+          "min": 1433.0,
+          "q05": 1433.0,
+          "median": 1433.0,
+          "q95": 1433.0,
+          "max": 1433.0
+        },
+        "effective_support": {
+          "min": 830.2434692382812,
+          "q05": 830.2856750488281,
+          "median": 834.63623046875,
+          "q95": 834.7769012451172,
+          "max": 834.8723754882812
+        },
+        "negative_fraction": {
+          "min": 0.506629467010498,
+          "q05": 0.5073272585868835,
+          "median": 0.5073272585868835,
+          "q95": 0.5143056511878967,
+          "max": 0.5143056511878967
+        },
+        "norm": {
+          "min": 4653.46728515625,
+          "q05": 4787.391845703125,
+          "median": 5053.40234375,
+          "q95": 5216.876220703125,
+          "max": 5325.81787109375
+        }
+      }
+    },
+    "branch_1": {
+      "selected": 128,
+      "tp": 42,
+      "precision": 0.328125,
+      "recall": 1.0
+    },
+    "branch_2": {
+      "selected": 61,
+      "tp": 42,
+      "precision": 0.6885245901639344,
+      "recall": 1.0
+    },
+    "attach_branch_histogram": {
+      "3": 42
+    }
+  }
+]

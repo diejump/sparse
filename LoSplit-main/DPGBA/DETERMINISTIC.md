@@ -1,6 +1,11 @@
 # DPGBA严格确定性运行配置
 
-本配置只修改两个作者入口的运行设置；`Backdoor.fit`、模型forward、损失、优化器、采样逻辑、原末轮保存行为及原防御计算代码保持不变。未更换GPU算子或加入运行时函数替换。
+确定性运行开关不更换 GPU 算子或加入运行时函数替换。
+
+2026-11-23 实现修订：对照 DPGBA 官方固定版本，恢复 `range=1.0` 和双类别分布判别标签；
+参考样本不足时明确报错。模型结构、优化器、末轮保存方式保持原实现。
+以下早期逐位复现记录对应修订前版本；修订后结果见
+`../runs/dpgba_official_fix_20261123/FIX_REPORT.md`，不得用早期哈希验证新版输出。
 
 已实测范围：本机RTX3050 Laptop / PyTorch2.0.0+cu118 / PyG2.5.3、Cora、GCN、随机挂接、outter_size4096。两次独立完整300轮训练得到逐位一致的末轮生成器和投毒快照；四种分类器及预测也逐位一致。结果见 `D:/GNNAttackReaserch/work/dpgba_deterministic_side_20261120/RESULTS.md`。
 
@@ -31,7 +36,7 @@ New-Item -ItemType Directory -Force -Path $Output | Out-Null
 ## 读取同一快照运行防御
 
 ```powershell
-$Common = @('--deterministic','--dataset=Cora','--model=GCN','--test_model=GCN','--device_id=0','--seed=10','--hidden=32','--epochs=200','--train_lr=0.01','--target_class=0',"--trigger_generator_address=$Output/generator.pth","--pre_train_param=$Output/poison.pt")
+$Common = @('--deterministic','--dataset=Cora','--model=GCN','--test_model=GCN','--device_id=0','--seed=10','--hidden=32','--epochs=200','--train_lr=0.015','--target_class=0',"--trigger_generator_address=$Output/generator.pth","--pre_train_param=$Output/poison.pt")
 
 & $py DPGBA/DPGBA_RIGBD.py @Common --defense_mode=none --skip_rigbd "--model_save_path=$Output/none.pth"
 & $py DPGBA/DPGBA_RIGBD.py @Common --defense_mode=prune --prune_thr=0.8 --skip_rigbd "--model_save_path=$Output/prune.pth"

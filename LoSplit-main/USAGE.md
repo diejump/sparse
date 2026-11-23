@@ -36,7 +36,8 @@ $InputRoot = 'D:/GNNAttackReaserch/work/cora_fixed_20261120'
 $OutputRoot = 'D:/GNNAttackReaserch/work/my_defense_run'
 New-Item -ItemType Directory -Force -Path "$OutputRoot/$Attack" | Out-Null
 $Inputs = @("--pre_train_param=$InputRoot/$Attack/poison.pt", "--trigger_generator_address=$InputRoot/$Attack/generator.pth")
-$Common = @('--dataset=Cora','--model=GCN','--test_model=GCN','--device_id=0','--seed=10','--hidden=32','--epochs=200','--train_lr=0.01','--target_class=0')
+$ClassifierLR = @{ GTA=0.01; UGBA=0.01; DPGBA=0.015 }[$Attack]
+$Common = @('--dataset=Cora','--model=GCN','--test_model=GCN','--device_id=0','--seed=10','--hidden=32','--epochs=200',"--train_lr=$ClassifierLR",'--target_class=0')
 $PruneThreshold = @{ GTA=0.8; UGBA=0.2; DPGBA=0.8 }[$Attack]
 
 # 无防御：普通GCN

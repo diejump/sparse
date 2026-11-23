@@ -18,8 +18,8 @@ SETTINGS = {
     "methods": ["none", "prune", "rigbd", "abp", "abp_dual", "abp_assisted"],
     "seed": 10,
     "gpu": "0",                     # physical GPU; child uses visible device 0
-    "attack_root": "runs/my_cora_attacks",
-    "defense_root": "runs/my_cora_defenses",
+    "attack_root": "runs/my_cora_attacks3",
+    "defense_root": "runs/my_cora_defenses3",
     "report": None,                 # None: <defense_root>/results.md (attack-only: attack_root)
 }
 PROJECT = Path(__file__).resolve().parent
@@ -72,7 +72,7 @@ def build_jobs(args):
                 if method == "prune":
                     extra.append(f"--prune_thr={0.2 if attack == 'UGBA' else 0.8}")
                 jobs.append((f"{attack}/{method}", PROJECT / f"{prefix}{attack}_RIGBD.py",
-                             common + ["--train_lr=0.01"] + inputs + extra
+                             common + ["--train_lr=0.015" if attack == "DPGBA" else "--train_lr=0.01"] + inputs + extra
                              + [f"--model_save_path={output}"],
                              [output], [generator, snapshot], output.with_suffix(".log")))
     return jobs

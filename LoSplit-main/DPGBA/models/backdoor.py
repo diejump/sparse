@@ -14,6 +14,23 @@ from sklearn.decomposition import PCA
 # from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.manifold import TSNE
 from models.reconstruct import MLPAE
+
+
+def distribution_detector_batch(output, generated_count):
+    """Match the official reference=1/generated=0 balanced detector batch."""
+    reference_count = len(output) - generated_count
+    if generated_count <= 0 or reference_count < generated_count:
+        raise ValueError(
+            'DPGBA distribution reference pool must contain at least as many '
+            'samples as generated nodes (reference={}, generated={}). '
+            'Check --range; the official Cora default is 1.0.'.format(
+                reference_count, generated_count))
+    indices = torch.randperm(reference_count)[:generated_count]
+    batch = torch.cat([output[:reference_count][indices], output[reference_count:]], dim=0)
+    labels = torch.cat([torch.ones(generated_count, device=output.device, dtype=torch.long),
+                        torch.zeros(generated_count, device=output.device, dtype=torch.long)])
+    return batch, labels
+
 #%%
 from sklearn.manifold import TSNE
 
@@ -317,7 +334,21 @@ class Backdoor:
           
             self.trojan.load_state_dict(state_dict)
             return 0
- 
+
+        generated_count = len(idx_attach) * args.trigger_size
+        self.distribution_diagnostics = {
+            'implementation': 'official_balanced_labels_v1',
+            'range': float(args.range),
+            'candidate_count': len(features_select),
+            'reference_count': len(selected_features),
+            'generated_count': generated_count,
+        }
+        print('DPGBA_DISTRIBUTION:', self.distribution_diagnostics, flush=True)
+        if generated_count <= 0 or len(selected_features) < generated_count:
+            raise ValueError('Insufficient DPGBA reference samples: {} for {} generated nodes; '
+                             'check --range (official Cora default: 1.0).'.format(
+                                 len(selected_features), generated_count))
+
         loss_best = 1e8
         for i in range(args.trojan_epochs):
             for j in range(self.args.inner):
@@ -341,13 +372,8 @@ class Backdoor:
                 for k in range(self.args.k):
                     optimizer_detector.zero_grad()
                     output_detector = self.ood_detector(ood_x)
-                    # ood_labels = torch.cat([torch.ones(len(trojan_feat), device=self.device),torch.zeros(len(trojan_feat), device=self.device)])
-                    ood_labels = torch.ones(len(trojan_feat), device=self.device)
-                    num_to_select = len(idx_attach) * self.args.trigger_size
-                    random_indices = torch.randperm(len(output_detector) - len(trojan_feat))[:num_to_select]
-                    concatenated_tensors = torch.cat((output_detector[:-len(trojan_feat)][random_indices], 
-                                                      output_detector[-len(trojan_feat):]),
-                                                      dim=0)
+                    concatenated_tensors, ood_labels = distribution_detector_batch(
+                        output_detector, len(trojan_feat))
                     loss_detector = F.nll_loss(concatenated_tensors, ood_labels.long())
                     loss_detector.backward()
                     optimizer_detector.step()
@@ -412,7 +438,7 @@ class Backdoor:
 
             if args.debug and i % 50 == 0:
                 print('Epoch {}, loss_inner: {:.5f}, loss_target: {:.5f},  loss_dis: {:.5f}, loss_diff: {:.5f}, loss_adv: {:.5f}, loss_targetclass: {:.5f}, ood_score: {:.5f} '\
-                        .format(i, loss_inner, loss_target,  loss_dis, loss_dis, loss_target, loss_targetclass,  torch.exp(output_detector[-len(trojan_feat):][:,-1:]).mean()))
+                        .format(i, loss_inner, loss_target,  loss_dis, loss_dis, loss_target, loss_targetclass,  torch.exp(output_detector[-len(trojan_feat):, 1]).mean()))
                 print("acc_train_clean: {:.4f}, ASR_train_attach: {:.4f}, ASR_train_outter: {:.4f}"\
                         .format(acc_train_clean,acc_train_attach,acc_train_outter))
         state_dict = self.trojan.state_dict()

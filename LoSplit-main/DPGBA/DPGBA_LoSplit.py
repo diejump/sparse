@@ -60,7 +60,7 @@ parser.add_argument('--use_vs_number', action='store_true', default=True,
                     help="if use detailed number to decide Vs")
 parser.add_argument('--vs_ratio', type=float, default=0,
                     help="ratio of poisoning nodes relative to the full graph")
-parser.add_argument('--range', type=float, default=0.01,
+parser.add_argument('--range', type=float, default=1.0,
                     help="ratio of poisoning nodes relative to the full graph")
 parser.add_argument('--vs_number', type=int, default=40,
                     help="number of poisoning nodes relative to the full graph")
@@ -329,6 +329,7 @@ data_to_save = {
     'generation_seed': args.seed,
     'classifier_seed': classifier_seed,
     'classifier_train_lr': args.train_lr,
+    'distribution_diagnostics': model.distribution_diagnostics,
     'source_defense_mode': args.defense_mode,
     'target_class': args.target_class,
     'trigger_size': args.trigger_size,

@@ -96,7 +96,7 @@ parser.add_argument('--vs_number', type=int, default=40,
                     help="ratio of poisoning nodes relative to the full graph")
 # defense setting
 parser.add_argument('--defense_mode', type=str, default="none",
-                    choices=['prune', 'isolate', 'none', 'reconstruct', 'abp','abp_dual','abp_assisted'],
+                    choices=['prune', 'isolate', 'none', 'reconstruct', 'abp','abp_sparse','abp_dual','abp_assisted'],
                     help="Mode of defense")
 parser.add_argument('--prune_thr', type=float, default=0.8,
                     help="Threshold of prunning edges")
@@ -124,6 +124,8 @@ parser.add_argument('--rec_epochs', type=int,  default=100,
 parser.add_argument('--trigger_generator_address', type=str, default='./weights/GTA/Cora/GTA_Cora_weights.pth')
 parser.add_argument('--pre_train_param', type=str, default='./weights/GTA/Cora/GTA_Cora_RIGBD.pt')
 # args = parser.parse_args()
+from experiment_defenses import add_arguments, run_comparison
+add_arguments(parser)
 args = parser.parse_known_args()[0]
 if args.defense_mode in ('abp', 'abp_dual', 'abp_assisted'):
     args.skip_rigbd = True
@@ -137,8 +139,6 @@ cuda_disabled = args.no_cuda or (
 args.cuda = not cuda_disabled and torch.cuda.is_available()
 device = torch.device('cuda:{}'.format(args.device_id) if args.cuda else 'cpu')
 if args.deterministic:
-    if args.dataset != 'Cora' or args.test_model != 'GCN':
-        parser.error('Strict mode is currently audited for Cora/GCN')
     from deterministic_runtime import configure_determinism
     configure_determinism(args.seed, args.cuda)
 
@@ -284,6 +284,9 @@ print('GENERATOR_MATCHES_SNAPSHOT: True')
 
 
 # ===== 固定快照加载结束，继续作者原防御代码 =====
+if args.defense_mode in ('none', 'abp', 'abp_sparse', 'prune'):
+    run_comparison(args, data, device, poison_snapshot, model, model_construct, prune_unrelated_edge)
+    raise SystemExit(0)
 if args.defense_mode == 'abp':
     from models.ABP import filter_edges
     # Keep the complete observed graph for the two separate evaluation projections.

@@ -132,8 +132,6 @@ cuda_disabled = args.no_cuda or (
 args.cuda = not cuda_disabled and torch.cuda.is_available()
 device = torch.device('cuda:{}'.format(args.device_id) if args.cuda else 'cpu')
 if args.deterministic:
-    if args.dataset != 'Cora' or args.test_model != 'GCN':
-        parser.error('Strict mode is currently audited for Cora/GCN')
     from deterministic_runtime import configure_determinism
     configure_determinism(args.seed, args.cuda)
 

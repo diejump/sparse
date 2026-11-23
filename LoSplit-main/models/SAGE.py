@@ -35,6 +35,8 @@ class GraphSage(nn.Module):
         self.weight_decay = weight_decay
 
     def forward(self, x, edge_index, edge_weight=None):
+        if edge_weight is not None:
+            edge_index = edge_index[:, edge_weight > 0]
         for conv in self.convs:
             x = F.relu(conv(x, edge_index))
             x = F.dropout(x, self.dropout, training=self.training)

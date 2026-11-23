@@ -21,8 +21,8 @@ class GAT(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GATConv(nfeat,nhid,heads,dropout=dropout)
-        self.gc2 = GATConv(heads*nhid, nclass, concat=False, dropout=dropout)
+        self.gc1 = GATConv(nfeat,nhid,heads,dropout=dropout,add_self_loops=self_loop)
+        self.gc2 = GATConv(heads*nhid, nclass, concat=False, dropout=dropout,add_self_loops=self_loop)
         self.dropout = dropout
         self.lr = lr
         if not with_relu:
@@ -39,6 +39,8 @@ class GAT(nn.Module):
         self.features = None
 
     def forward(self, x, edge_index, edge_weight=None): 
+        if edge_weight is not None:
+            edge_index = edge_index[:, edge_weight > 0]
         x = F.dropout(x, p=self.dropout, training=self.training)    # optional
         # x = F.elu(self.gc1(x, edge_index, edge_weight))   # may apply later 
         x = F.elu(self.gc1(x, edge_index))
@@ -69,7 +71,7 @@ class GAT(nn.Module):
         for i in range(train_iters):
             self.train()
             optimizer.zero_grad()
-            output, x = self.forward(self.features, self.edge_index, self.edge_weight)
+            output = self.forward(self.features, self.edge_index, self.edge_weight)
             loss_train = F.nll_loss(output[idx1], labels[idx1])
             probs = F.softmax(output[idx2], dim=1)
             target_probs = probs[range(len(labels[idx2])), labels[idx2]]

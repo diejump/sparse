@@ -1,0 +1,197 @@
+[
+  {
+    "path": "runs\\my_cora_attacks3\\GTA\\poison.pt",
+    "counts": {
+      "idx_train": 541,
+      "idx_attach": 40,
+      "idx_val": 270,
+      "idx_clean_test": 270,
+      "idx_atk": 271
+    },
+    "overlap": {
+      "idx_train&idx_attach": 0,
+      "idx_train&idx_val": 0,
+      "idx_train&idx_clean_test": 0,
+      "idx_train&idx_atk": 0,
+      "idx_attach&idx_val": 9,
+      "idx_attach&idx_clean_test": 0,
+      "idx_attach&idx_atk": 0,
+      "idx_val&idx_clean_test": 0,
+      "idx_val&idx_atk": 0,
+      "idx_clean_test&idx_atk": 0
+    },
+    "validation_label_changes": 9,
+    "changed_validation_ids": [
+      291,
+      452,
+      760,
+      801,
+      898,
+      957,
+      1148,
+      1231,
+      2579
+    ]
+  },
+  {
+    "path": "runs\\my_cora_attacks3\\UGBA\\poison.pt",
+    "counts": {
+      "idx_train": 541,
+      "idx_attach": 40,
+      "idx_val": 270,
+      "idx_clean_test": 270,
+      "idx_atk": 271
+    },
+    "overlap": {
+      "idx_train&idx_attach": 0,
+      "idx_train&idx_val": 0,
+      "idx_train&idx_clean_test": 0,
+      "idx_train&idx_atk": 0,
+      "idx_attach&idx_val": 10,
+      "idx_attach&idx_clean_test": 0,
+      "idx_attach&idx_atk": 0,
+      "idx_val&idx_clean_test": 0,
+      "idx_val&idx_atk": 0,
+      "idx_clean_test&idx_atk": 0
+    },
+    "validation_label_changes": 10,
+    "changed_validation_ids": [
+      291,
+      384,
+      616,
+      719,
+      1000,
+      1114,
+      1263,
+      1339,
+      1819,
+      1971
+    ]
+  },
+  {
+    "path": "runs\\my_cora_attacks3\\DPGBA\\poison.pt",
+    "counts": {
+      "idx_train": 541,
+      "idx_attach": 42,
+      "idx_val": 270,
+      "idx_clean_test": 270,
+      "idx_atk": 271
+    },
+    "overlap": {
+      "idx_train&idx_attach": 0,
+      "idx_train&idx_val": 0,
+      "idx_train&idx_clean_test": 0,
+      "idx_train&idx_atk": 0,
+      "idx_attach&idx_val": 9,
+      "idx_attach&idx_clean_test": 0,
+      "idx_attach&idx_atk": 0,
+      "idx_val&idx_clean_test": 0,
+      "idx_val&idx_atk": 0,
+      "idx_clean_test&idx_atk": 0
+    },
+    "validation_label_changes": 9,
+    "changed_validation_ids": [
+      291,
+      452,
+      760,
+      801,
+      898,
+      957,
+      1148,
+      1231,
+      2579
+    ]
+  },
+  {
+    "path": "runs\\abp_sparse_20261123\\seed11\\inputs\\DPGBA\\poison.pt",
+    "counts": {
+      "idx_train": 541,
+      "idx_attach": 41,
+      "idx_val": 270,
+      "idx_clean_test": 270,
+      "idx_atk": 271
+    },
+    "overlap": {
+      "idx_train&idx_attach": 0,
+      "idx_train&idx_val": 0,
+      "idx_train&idx_clean_test": 0,
+      "idx_train&idx_atk": 0,
+      "idx_attach&idx_val": 6,
+      "idx_attach&idx_clean_test": 0,
+      "idx_attach&idx_atk": 0,
+      "idx_val&idx_clean_test": 0,
+      "idx_val&idx_atk": 0,
+      "idx_clean_test&idx_atk": 0
+    },
+    "validation_label_changes": 6,
+    "changed_validation_ids": [
+      291,
+      819,
+      1426,
+      1430,
+      1601,
+      1924
+    ]
+  },
+  {
+    "path": "runs\\abp_sparse_20261123\\seed11\\inputs\\GTA\\poison.pt",
+    "counts": {
+      "idx_train": 541,
+      "idx_attach": 39,
+      "idx_val": 270,
+      "idx_clean_test": 270,
+      "idx_atk": 271
+    },
+    "overlap": {
+      "idx_train&idx_attach": 0,
+      "idx_train&idx_val": 0,
+      "idx_train&idx_clean_test": 0,
+      "idx_train&idx_atk": 0,
+      "idx_attach&idx_val": 5,
+      "idx_attach&idx_clean_test": 0,
+      "idx_attach&idx_atk": 0,
+      "idx_val&idx_clean_test": 0,
+      "idx_val&idx_atk": 0,
+      "idx_clean_test&idx_atk": 0
+    },
+    "validation_label_changes": 5,
+    "changed_validation_ids": [
+      291,
+      819,
+      1426,
+      1601,
+      1924
+    ]
+  },
+  {
+    "path": "runs\\abp_sparse_20261123\\seed11\\inputs\\UGBA\\poison.pt",
+    "counts": {
+      "idx_train": 541,
+      "idx_attach": 42,
+      "idx_val": 270,
+      "idx_clean_test": 270,
+      "idx_atk": 271
+    },
+    "overlap": {
+      "idx_train&idx_attach": 0,
+      "idx_train&idx_val": 0,
+      "idx_train&idx_clean_test": 0,
+      "idx_train&idx_atk": 0,
+      "idx_attach&idx_val": 6,
+      "idx_attach&idx_clean_test": 0,
+      "idx_attach&idx_atk": 0,
+      "idx_val&idx_clean_test": 0,
+      "idx_val&idx_atk": 0,
+      "idx_clean_test&idx_atk": 0
+    },
+    "validation_label_changes": 6,
+    "changed_validation_ids": [
+      24,
+      108,
+      287,
+      898,
+      1339,
+      2407
+    ]
+  }
+]

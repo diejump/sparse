@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-23",
+  "question": "在检测精确率与召回率均大于90%的条件下进一步降低ASR",
+  "base_method_parameter_count": 1,
+  "extended_method_parameter_count": 2,
+  "parameters": {"threshold_multiplier": [0.9, 0.95, 2.0], "detected_label_penalty": [0.0, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0]},
+  "screen": {"generation_seed": 10, "classifier_seed": 10, "kinds": ["GTA", "UGBA", "DPGBA"], "test_evaluation": false},
+  "selection": {"minimum_precision": 0.9, "minimum_recall": 0.9, "strict_greater_than": true, "max_validation_accuracy_drop": 0.02, "max_validation_inferred_class_accuracy_drop": 0.05, "objective": "minimize mean common-validation nonclass-to-inferred-class error; then maximize validation accuracy; then use smaller penalty", "baseline": {"threshold_multiplier": 2.0, "detected_label_penalty": 0.0}, "common_validation": "validation nodes excluding detections at multiplier 0.9, using observed labels only"},
+  "confirmation": "retrain selected candidates with classifier seeds20/30 before final selection",
+  "final_evaluation": "fixed selected setting on generation seeds11/12 and newly generated seed13, with classifier seeds10/20/30",
+  "training": {"hidden": 32, "layers": 2, "dropout": 0.5, "weight_decay": 0.0005, "epochs": 200, "GTA_UGBA_lr": 0.01, "DPGBA_lr": 0.015},
+  "detection_metrics": "evaluate actual target receiver identities within all supervised training nodes",
+  "test_metrics": "CA on original clean test subset; ASR on triggered test nodes whose original class differs from target; report denominators"
+}

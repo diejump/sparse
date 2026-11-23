@@ -126,8 +126,6 @@ cuda_disabled = args.no_cuda or (
 args.cuda = not cuda_disabled and torch.cuda.is_available()
 device = torch.device('cuda:{}'.format(args.device_id) if args.cuda else 'cpu')
 if args.deterministic:
-    if args.dataset != 'Cora' or args.test_model != 'GCN' or args.selection_method != 'none' or args.outter_size != 4096:
-        parser.error('Strict mode is audited for Cora/GCN, selection_method=none, outter_size=4096')
     from deterministic_runtime import configure_determinism
     configure_determinism(args.seed, args.cuda)
 
@@ -262,7 +260,7 @@ else:
 
 
 # models = ['GCN','GAT', 'GraphSage']
-models = ['GCN']
+models = [args.test_model]
 total_overall_asr = 0
 total_overall_ca = 0
 for test_model in models:
@@ -276,7 +274,8 @@ for test_model in models:
     test_model = model_construct(args,args.test_model,data,device).to(device) 
     test_model.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val,train_iters=args.epochs,verbose=False)
 
-    output, x = test_model(poison_x,poison_edge_index,poison_edge_weights)
+    output = test_model(poison_x,poison_edge_index,poison_edge_weights)
+    output = output[0] if isinstance(output, tuple) else output
     train_attach_rate = (output.argmax(dim=1)[idx_attach]==args.target_class).float().mean()
     #%%
     induct_edge_index = torch.cat([poison_edge_index,mask_edge_index],dim=1)
@@ -287,7 +286,8 @@ for test_model in models:
     induct_x, induct_edge_index,induct_edge_weights = induct_x.clone().detach(), induct_edge_index.clone().detach(),induct_edge_weights.clone().detach()
     if(args.defense_mode == 'prune' or args.defense_mode == 'isolate'):
         induct_edge_index,induct_edge_weights = prune_unrelated_edge(args,induct_edge_index,induct_edge_weights,induct_x,device)
-    output, x = test_model(induct_x,induct_edge_index,induct_edge_weights)
+    output = test_model(induct_x,induct_edge_index,induct_edge_weights)
+    output = output[0] if isinstance(output, tuple) else output
     train_attach_rate = (output.argmax(dim=1)[idx_atk]==args.target_class).float().mean()
     asr = train_attach_rate
     flip_idx_atk = idx_atk[(data.y[idx_atk] != args.target_class).nonzero().flatten()]

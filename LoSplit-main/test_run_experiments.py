@@ -1,5 +1,6 @@
 """Launcher report checks without importing torch or running training."""
 import contextlib
+import ast
 from argparse import Namespace
 import io
 from pathlib import Path
@@ -11,6 +12,52 @@ import run_experiments as runner
 
 
 class ReportTests(unittest.TestCase):
+    def test_rigbd_selects_minimum_asr_and_stable_ties(self):
+        # Load only the pure selector; no torch imports or model execution.
+        tree = ast.parse((runner.PROJECT / 'experiment_defenses.py').read_text(encoding='utf-8'))
+        selector = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                        and node.name == 'rigbd_selection_key')
+        namespace = {}
+        exec(compile(ast.Module(body=[selector], type_ignores=[]), '<rigbd_selector>', 'exec'), namespace)
+        key = namespace['rigbd_selection_key']
+        candidates = [dict(ASR=.2, CA=.9, ValidationAccuracy=.95, K=10, b=.3),
+                      dict(ASR=.1, CA=.8, ValidationAccuracy=.8, K=50, b=.7),
+                      dict(ASR=.1, CA=.7, ValidationAccuracy=.7, K=20, b=.5),
+                      dict(ASR=.1, CA=.6, ValidationAccuracy=.6, K=20, b=.3)]
+        self.assertIs(max(candidates[:2], key=key), candidates[1])
+        self.assertIs(max(candidates, key=key), candidates[3])
+
+    def test_comparison_methods_and_model_dataset_flags(self):
+        for dataset in ('Cora', 'Citeseer', 'Pubmed', 'Physics'):
+            for model in ('GCN', 'GAT', 'GraphSage'):
+                args = Namespace(stage='all', attacks=['GTA', 'UGBA', 'DPGBA'],
+                    methods=runner.SETTINGS['methods'], seed=10, dataset=dataset, model=model,
+                    attack_root='inputs/{dataset}/{model}', defense_root='outputs/{dataset}/{model}')
+                jobs = runner.build_jobs(args)
+                self.assertEqual(len(jobs), 18)
+                for name, entry, flags, outputs, inputs, log in jobs:
+                    self.assertIn('--dataset=' + dataset, flags)
+                    self.assertIn('--test_model=' + model, flags)
+                    self.assertIn('--model=GCN', flags)
+                    self.assertTrue(entry.is_file())
+                    self.assertIn(dataset, outputs[0].parts)
+                    if name.endswith('/abp_sparse'):
+                        self.assertIn('--abp_sparse_multiplier=0.95', flags)
+                        self.assertIn('--abp_sparse_strength=0.25', flags)
+                    if name.endswith('/rigbd'):
+                        self.assertIn('--rigbd_grid', flags)
+
+    def test_json_metrics_preserve_seconds_and_best_parameters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / 'task.log'
+            log.write_text('FINAL_COMPARISON_JSON {"CA":0.8,"ASR":0.1,"Precision":null,'
+                           '"Recall":null,"Seconds":123.5,"GridSeconds":300.0,"K":100,"b":0.7}\n',
+                           encoding='utf-8')
+            metrics = runner.parse_metrics(log, 'rigbd')
+            self.assertEqual(metrics['Seconds'], 123.5)
+            self.assertEqual(metrics['K'], 100)
+            self.assertIsNone(metrics['Precision'])
+
     def test_dpgba_classifier_learning_rates_match(self):
         args = Namespace(stage='all', attacks=['DPGBA'], methods=['none'], seed=10,
                          attack_root='runs/test_inputs', defense_root='runs/test_outputs')
@@ -47,7 +94,9 @@ class ReportTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"test")
             content = ("****After GTA Attack****\nASR: 0.9\nClean Accuracy: 0.8\n"
-                       if name.endswith("/attack") else "FINAL_DEFENSE_RESULT method=none CA=0.8 ASR=0.1\n")
+                       if name.endswith("/attack") else
+                       'FINAL_COMPARISON_JSON {"CA":0.8,"ASR":0.1,"Precision":null,'
+                       '"Recall":null,"Seconds":1.25,"DetectionSeconds":null}\n')
             log.write_text(content, encoding="utf-8")
 
         with patch("sys.argv", arguments), patch.object(runner.subprocess, "run"), \
@@ -67,6 +116,11 @@ class ReportTests(unittest.TestCase):
             self.assertIn("10.0000", report)
             self.assertIn("GTA/attack", report)
             self.assertIn("GTA/prune", report)
+            self.assertIn('1.2500', report)
+            import json
+            results = json.loads((Path(directory) / 'defenses/results.json').read_text(encoding='utf-8'))
+            self.assertEqual(results['records']['GTA/none']['metrics']['Seconds'], 1.25)
+            self.assertIsNone(results['records']['GTA/none']['metrics']['Precision'])
 
     def test_failure_and_interrupt_preserve_results(self):
         for error in (RuntimeError("training failed"), KeyboardInterrupt()):

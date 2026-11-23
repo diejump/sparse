@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "date": "2026-11-23",
+  "status": "fixed before evaluating new generation seeds 11 and 12",
+  "dataset": "Cora",
+  "development_generation_seed": 10,
+  "validation_generation_seeds": [11, 12],
+  "classifier_seeds": [10, 20, 30],
+  "methods": ["none", "abp", "abp_all_candidates", "abp_sparse"],
+  "feature_score": "sum(abs(x))^2 / sum(x^2), stable row scaling, zero mapped to zero",
+  "reference_nodes": "unique observed supervised and validation identities; no labels in calibration",
+  "threshold": "2 * max reference effective support",
+  "candidate_rule": "receiver of at least one positive-weight direction deleted by original ABP",
+  "detection_rule": "candidate has at least one blocked sender whose support score exceeds threshold",
+  "label_rule": "omit detected receivers from supervised loss and validation model selection",
+  "projection_anchors": "all original observed supervised identities, including flagged receivers",
+  "projection_policy": "always apply positive-edge ABP, in training, clean evaluation and triggered evaluation",
+  "classifier": {"name": "author GCN", "hidden": 32, "dropout": 0.5, "epochs": 200, "weight_decay": 0.0005, "GTA_UGBA_lr": 0.01, "DPGBA_lr": 0.015, "selection": "original maximum validation accuracy rule"},
+  "evaluation": {"ASR_upper_target": 0.1, "precision_lower_target": 0.9, "recall_lower_target": 0.9, "also_report": ["CA", "confusion_counts", "untriggered_target_error", "maximum_original_logit_delta", "prediction_changes"]},
+  "stress": "remove all positive internal generated-node edges, retain single receiver attachment",
+  "interpretation": "fixed-snapshot development followed by new generator-seed validation on the same fixed Cora node split (utils.get_split uses RandomState(10)); not independent graphs, independent node splits, or proof of universal detectability"
+}

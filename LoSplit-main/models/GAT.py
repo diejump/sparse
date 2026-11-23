@@ -21,8 +21,8 @@ class GAT(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GATConv(nfeat,nhid,heads,dropout=dropout)
-        self.gc2 = GATConv(heads*nhid, nclass, concat=False, dropout=dropout)
+        self.gc1 = GATConv(nfeat,nhid,heads,dropout=dropout,add_self_loops=self_loop)
+        self.gc2 = GATConv(heads*nhid, nclass, concat=False, dropout=dropout,add_self_loops=self_loop)
         self.dropout = dropout
         self.lr = lr
         if not with_relu:
@@ -39,6 +39,8 @@ class GAT(nn.Module):
         self.features = None
 
     def forward(self, x, edge_index, edge_weight=None): 
+        if edge_weight is not None:
+            edge_index = edge_index[:, edge_weight > 0]
         x = F.dropout(x, p=self.dropout, training=self.training)    # optional
         # x = F.elu(self.gc1(x, edge_index, edge_weight))   # may apply later 
         x = F.elu(self.gc1(x, edge_index))
@@ -89,7 +91,8 @@ class GAT(nn.Module):
                 self.finetune5(self.labels, idx_train, idx_val, attach, clean, train_iters, verbose, clean_labels)
             elif finetune6 == True:
                 self.finetune6(self.labels, idx_train, idx_val, attach, train_iters, verbose, attach_feature)
-            self._train_with_val(self.labels, idx_train, idx_val, train_iters, verbose)
+            else:
+                self._train_with_val(self.labels, idx_train, idx_val, train_iters, verbose)
 
     #RIGBD Finetune
     def finetune1(self, labels, idx_train, idx_val, idx_attach, idx_clean, train_iters, verbose):

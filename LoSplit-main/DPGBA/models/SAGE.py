@@ -35,6 +35,8 @@ class GraphSage(nn.Module):
         self.weight_decay = weight_decay
 
     def forward(self, x, edge_index, edge_weight=None):
+        if edge_weight is not None:
+            edge_index = edge_index[:, edge_weight > 0]
         for conv in self.convs:
             x = F.relu(conv(x, edge_index))
             x = F.dropout(x, self.dropout, training=self.training)
@@ -64,7 +66,7 @@ class GraphSage(nn.Module):
         for i in range(train_iters):
             self.train()
             optimizer.zero_grad()
-            output, x = self.forward(self.features, self.edge_index, self.edge_weight)
+            output = self.forward(self.features, self.edge_index, self.edge_weight)
             loss_train = F.nll_loss(output[idx1], labels[idx1])
             probs = F.softmax(output[idx2], dim=1)
             target_probs = probs[range(len(labels[idx2])), labels[idx2]]

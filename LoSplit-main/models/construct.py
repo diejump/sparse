@@ -52,6 +52,7 @@ def model_construct(args,model_name,data,device, add_self_loops=True, split_lr=0
                     nhid=args.hidden, 
                     nclass=int(data.y.max()+1), 
                     heads=8,
+                    self_loop=add_self_loops,
                     dropout=args.dropout, 
                     lr=args.train_lr, 
                     weight_decay=args.weight_decay, 

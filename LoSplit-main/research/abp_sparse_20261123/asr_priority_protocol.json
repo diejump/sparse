@@ -1,0 +1,11 @@
+{
+  "purpose": "补充检验更强调降低ASR的设置，并报告正常分类的代价",
+  "source": "惩罚强度2和4均来自此前设定的参数网格",
+  "threshold_multiplier": 2.0,
+  "penalty_weights": [2.0, 4.0],
+  "generation_seed": 13,
+  "classifier_seeds": [10, 20, 30],
+  "kinds": ["GTA", "UGBA", "DPGBA"],
+  "metrics": ["ASR", "CA", "Precision", "Recall", "FPR", "指定类别干净测试节点的分类准确率"],
+  "relationship_to_selection": "保留已完成的验证集参数选择；单独列出更低ASR设置的实测取舍"
+}

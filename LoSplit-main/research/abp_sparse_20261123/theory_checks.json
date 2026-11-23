@@ -1,0 +1,29 @@
+{
+  "status": "passed",
+  "completed_utc": "2026-11-23T06:33:09.378257+00:00",
+  "exhaustive_graph_anchor_cases": 1022,
+  "random_graft_gcn_cases": 100,
+  "max_logit_difference": 2.384185791015625e-07,
+  "atol": 1e-06,
+  "rtol": 1e-06,
+  "seed": 111,
+  "exhaustive_node_counts": [
+    2,
+    3,
+    4
+  ],
+  "random_original_node_count": 7,
+  "random_added_node_count": 3,
+  "random_edge_probability": 0.3,
+  "internal_patterns": [
+    "no internal edges",
+    "one internal edge",
+    "triangle"
+  ],
+  "device": "cpu",
+  "torch_version": "2.0.0+cu118",
+  "torch_geometric_version": "2.5.3",
+  "networkx_version": "3.3",
+  "elapsed_seconds": 0.6251556999995955,
+  "scope": "Finite implementation checks; general proofs are in theory_review.md."
+}

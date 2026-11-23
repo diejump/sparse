@@ -80,7 +80,7 @@ parser.add_argument('--vs_number', type=int, default=40,
                     help="number of poisoning nodes relative to the full graph")
 # defense setting
 parser.add_argument('--defense_mode', type=str, default="none",
-                    choices=['none','reconstruct','prune','abp','abp_dual','abp_assisted'],
+                    choices=['none','reconstruct','prune','abp','abp_sparse','abp_dual','abp_assisted'],
                     help="Mode of defense")
 parser.add_argument('--prune_thr', type=float, default=0.8,
                     help="Threshold of prunning edges")
@@ -124,6 +124,13 @@ parser.add_argument('--device_id', type=int, default=3,
 parser.add_argument('--trigger_generator_address', type=str, default='./DPGBA_Citeseer_weights.pth')
 parser.add_argument('--pre_train_param', type=str, default='./DPGBA_Citeseer.pt')
 # args = parser.parse_args()
+from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+import models
+models.__path__.append(str(Path(__file__).resolve().parents[1] / 'models'))
+from experiment_defenses import add_arguments, run_comparison
+add_arguments(parser)
 args = parser.parse_known_args()[0]
 if args.defense_mode in ('abp', 'abp_dual', 'abp_assisted'):
     args.skip_rigbd = True
@@ -137,8 +144,6 @@ cuda_disabled = args.no_cuda or (
 args.cuda = not cuda_disabled and torch.cuda.is_available()
 device = torch.device('cuda:{}'.format(args.device_id) if args.cuda else 'cpu')
 if args.deterministic:
-    if args.dataset != 'Cora' or args.test_model != 'GCN' or args.selection_method != 'none' or args.outter_size != 4096:
-        parser.error('Strict mode is audited for Cora/GCN, selection_method=none, outter_size=4096')
     from deterministic_runtime import configure_determinism
     configure_determinism(args.seed, args.cuda)
 
@@ -296,6 +301,9 @@ print('GENERATOR_MATCHES_SNAPSHOT: True')
 # poison_x, poison_edge_index, poison_edge_weights, poison_labels = model.get_poisoned()
 
 # ===== 固定快照加载结束，继续作者原防御代码 =====
+if args.defense_mode in ('none', 'abp', 'abp_sparse', 'prune'):
+    run_comparison(args, data, device, poison_snapshot, model, model_construct, prune_unrelated_edge)
+    raise SystemExit(0)
 if args.defense_mode == 'abp':
     from models.ABP import filter_edges
     # Keep the complete observed graph for the two separate evaluation projections.

@@ -8,6 +8,19 @@ def prepare_environment():
         os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG', ':4096:8')
 
 
+def seed_classifier(seed, use_cuda):
+    """Reset classifier RNGs; preserve process-start deterministic configuration."""
+    import random
+    import numpy as np
+    import torch
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if use_cuda:
+        torch.cuda.manual_seed_all(seed)
+    print('CLASSIFIER_SEED:', seed, flush=True)
+
+
 def configure_determinism(seed, use_cuda):
     import json
     import random

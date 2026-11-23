@@ -42,6 +42,24 @@ python run_experiments.py --stage defense --attacks DPGBA --methods abp_dual
 自定义的绝对路径需要按目标系统修改。`gpu` 为物理 GPU 编号，子进程统一使用可见设备 0。
 修改 `seed` 会同时更新训练参数和子进程启动前的 PYTHONHASHSEED。
 
+## 分类器独立随机种子
+
+GTA、UGBA、DPGBA 的 LoSplit/RIGBD 两类入口在启动时保留原有全局种子/确定性设置，
+并在评估分类器构造前额外调用 `seed_classifier`，重置 Python、NumPy、PyTorch CPU/CUDA RNG。
+默认分类器种子等于 `--seed`，所以现有启动器无需新增参数。
+如直接调用两个入口，也可给两边传入相同的 `--classifier_seed=123`。
+classifier_seed 可以不同于全局 seed，不要求修改进程启动时的 PYTHONHASHSEED。
+
+要比较攻击入口与 none，需两边都使用新代码、相同 classifier_seed 和分类器训练超参数，
+并加载同一份投毒图/生成器。none 需使用 `--defense_mode=none --skip_rigbd`。
+新规则不会复现修改前的历史攻击评估数值，需要重新运行攻击评估。
+只把防御入口的全局种子设置移动到 GCN 前，并不能使它对齐旧攻击入口。
+三个攻击均已接入；重置位置与 UGBA 一致，位于攻击评估分类器和防御入口的
+none/prune/ABP 分类器构造前。RIGBD 专用检测/恢复模型仍沿用原流程。
+DPGBA 的 `--classifier_rng_state` 历史回放参数优先于独立种子，指定该参数时按保存状态回放。
+这次修改不改变学习率、epochs、dropout 等训练参数。DPGBA 原有攻击/防御学习率差异保留，
+因此它们即使使用同一分类器种子，也不保证指标相等。
+
 输出模型或日志已存在时会停止，改用新输出目录再运行。失败会立即停止并保留日志，
 不会自动跳过可能不完整的攻击文件。DPGBA 作者代码还会写入项目根目录
 `model_weights.pth`；若该文件已存在，先备份或移走，再运行攻击生成。

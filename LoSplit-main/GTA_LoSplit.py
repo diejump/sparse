@@ -34,6 +34,8 @@ parser.add_argument('--debug', action='store_true',
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
 parser.add_argument('--seed', type=int, default=10, help='Random seed.')
+parser.add_argument('--classifier_seed', type=int, default=None,
+                    help='Independent evaluation classifier seed; defaults to --seed')
 parser.add_argument('--model', type=str, default='GCN', help='model',
                     choices=['GCN','GAT','GraphSage','GIN'])
 parser.add_argument('--dataset', type=str, default='Cora', 
@@ -259,6 +261,10 @@ print("precent of left attach nodes: {:.3f}"\
     #%%
 
 
+from deterministic_runtime import seed_classifier
+classifier_seed = args.seed if args.classifier_seed is None else args.classifier_seed
+seed_classifier(classifier_seed, args.cuda)
+
 test_model = model_construct(args,args.test_model,data,device).to(device) 
 
 if test_model == 'ABL':
@@ -316,6 +322,8 @@ data_to_save = {
     'dataset': args.dataset,
     'attack': 'GTA',
     'generation_seed': args.seed,
+    'classifier_seed': classifier_seed,
+    'classifier_train_lr': args.train_lr,
     'source_defense_mode': args.defense_mode,
     'target_class': args.target_class,
     'trigger_size': args.trigger_size,

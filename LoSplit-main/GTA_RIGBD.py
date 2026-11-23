@@ -65,6 +65,8 @@ parser.add_argument('--debug', action='store_true',
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
 parser.add_argument('--seed', type=int, default=10, help='Random seed.')
+parser.add_argument('--classifier_seed', type=int, default=None,
+                    help='Independent evaluation classifier seed; defaults to --seed')
 parser.add_argument('--model', type=str, default='GCN', help='model',
                     choices=['GCN','GAT','GraphSage','GIN'])
 parser.add_argument('--dataset', type=str, default='Cora', 
@@ -356,10 +358,14 @@ print("precent of left attach nodes: {:.3f}"\
 
 # ===== 保留图处理防御所需的分类器训练与评估 =====
 if args.defense_mode != "none" or args.skip_rigbd:
+    from deterministic_runtime import seed_classifier
+    classifier_seed = args.seed if args.classifier_seed is None else args.classifier_seed
     if args.defense_mode in ('abp_dual', 'abp_assisted'):
         from models.ABP_Learning import ABPLearning
+        seed_classifier(classifier_seed, args.cuda)
         test_model = ABPLearning(args, args.test_model, data, device, tuple_output=False).to(device)
     else:
+        seed_classifier(classifier_seed, args.cuda)
         test_model = model_construct(args,args.test_model,data,device).to(device) 
 
     if test_model == 'ABL':

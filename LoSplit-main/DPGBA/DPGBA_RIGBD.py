@@ -43,6 +43,8 @@ parser.add_argument('--debug', action='store_true',
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
 parser.add_argument('--seed', type=int, default=12, help='Random seed.')
+parser.add_argument('--classifier_seed', type=int, default=None,
+                    help='Independent evaluation classifier seed; defaults to --seed')
 parser.add_argument('--model', type=str, default='GCN', help='model',
                     choices=['GCN','GAT','GraphSage','GIN'])
 parser.add_argument('--dataset', type=str, default='Pubmed', 
@@ -374,6 +376,8 @@ if args.defense_mode != "none" or args.skip_rigbd:
         overall_asr = 0
         overall_ca = 0
         #%%
+        if args.defense_mode in ('abp_dual', 'abp_assisted'):
+            from models.ABP_Learning import ABPLearning
         if args.classifier_rng_state:
             classifier_rng = torch.load(args.classifier_rng_state, map_location='cpu')
             torch.set_rng_state(classifier_rng['cpu'])
@@ -381,8 +385,11 @@ if args.defense_mode != "none" or args.skip_rigbd:
                 torch.cuda.set_rng_state_all(classifier_rng['cuda'])
             np.random.set_state(classifier_rng['numpy'])
             print('CLASSIFIER_RNG_REPLAY:', args.classifier_rng_state)
+        else:
+            from deterministic_runtime import seed_classifier
+            classifier_seed = args.seed if args.classifier_seed is None else args.classifier_seed
+            seed_classifier(classifier_seed, args.cuda)
         if args.defense_mode in ('abp_dual', 'abp_assisted'):
-            from models.ABP_Learning import ABPLearning
             test_model = ABPLearning(args, args.test_model, data, device, tuple_output=True).to(device)
         else:
             test_model = model_construct(args,args.test_model,data,device).to(device) 

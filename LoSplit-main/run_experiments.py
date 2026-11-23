@@ -126,7 +126,7 @@ def write_report(path, args, jobs, records, started, overall):
              f"- 攻击目录：`{project_path(args.attack_root)}`",
              f"- 防御目录：`{project_path(args.defense_root)}`", "",
              "CA 为干净测试准确率，ASR 为非目标类攻击节点上的攻击成功率；下表指标单位均为 %。",
-             "攻击入口结果与 none 对照分别训练分类器，数值不保证相同。缺失指标显示 —，不视为零。", "",
+             "攻击入口与 none 分别训练分类器；仅当分类器构造前随机状态、训练输入和超参数均对齐时，才应得到一致结果。缺失指标显示 —，不视为零。", "",
              "| 攻击 | 阶段/方法 | 状态 | CA (%) | ASR (%) | Precision (%) | Recall (%) | FPR (%) | 耗时(s) | 日志 |",
              "|---|---|---|---:|---:|---:|---:|---:|---:|---|"]
     for job in jobs:

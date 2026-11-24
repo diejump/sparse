@@ -12,19 +12,20 @@ import time
 
 
 # IDE users: edit this block and click Run. Paths are relative to this file.
+name = "GCN4"
 SETTINGS = {
     "stage": "all",                 # attack / defense / all
     "attacks": ["GTA", "UGBA", "DPGBA"],
-    "methods": ["none", "abp", "abp_sparse", "prune", "rigbd"],
+    "methods": ["none", "abp", "abp_sparse", "prune", "rigbd","rigbd_selfloop"],
     "dataset": "Cora",              # Cora / Citeseer / Pubmed / Physics
     "model": "GCN",                 # GCN / GAT / GraphSage
     "deterministic": True,
     "abp_sparse_multiplier": 0.95,
     "abp_sparse_strength": 0.25,
-    "seed": 10,
+    "seed": 12,
     "gpu": "0",                     # physical GPU; child uses visible device 0
-    "attack_root": "runs/comparison_inputs/{dataset}/{model}/seed{seed}",
-    "defense_root": "runs/comparison_outputs/{dataset}/{model}/seed{seed}",
+    "attack_root": f"runs/comparison_inputs_{name}/{{dataset}}/{{model}}/seed{{seed}}",
+    "defense_root": f"runs/comparison_outputs_{name}/{{dataset}}/{{model}}/seed{{seed}}",
     "report": None,                 # None: <defense_root>/results.md (attack-only: attack_root)
 }
 PROJECT = Path(__file__).resolve().parent
@@ -43,6 +44,7 @@ METHOD_ARGS = {
     "none": ["--defense_mode=none", "--skip_rigbd"],
     "prune": ["--defense_mode=prune", "--skip_rigbd"],
     "rigbd": ["--defense_mode=none", "--rigbd_grid"],
+    "rigbd_selfloop": ["--defense_mode=none", "--rigbd_probe_self_loops"],
     "abp": ["--defense_mode=abp"],
     "abp_sparse": ["--defense_mode=abp_sparse"],
 }
@@ -75,6 +77,14 @@ def build_jobs(args):
             for method in args.methods:
                 output = defense_root / attack / f"{method}.pth"
                 extra = METHOD_ARGS[method].copy()
+                if method in ('rigbd', 'rigbd_selfloop'):
+                    if getattr(args, 'rigbd_fixed', False):
+                        extra = [flag for flag in extra if flag != '--rigbd_grid']
+                    extra += [f"--rigbd_k={getattr(args, 'rigbd_k', 20)}",
+                              f"--rigbd_b={getattr(args, 'rigbd_b', .5)}",
+                              f"--rigbd_selection={getattr(args, 'rigbd_selection', 'label_boundary')}",
+                              f"--rigbd_sampling={getattr(args, 'rigbd_sampling', 'receiver')}",
+                              f"--rigbd_grid_selection={getattr(args, 'rigbd_grid_selection', 'validation')}"]
                 if method == "abp_sparse":
                     extra += [f"--abp_sparse_multiplier={getattr(args, 'abp_sparse_multiplier', .95)}",
                               f"--abp_sparse_strength={getattr(args, 'abp_sparse_strength', .25)}"]
@@ -145,7 +155,8 @@ def write_report(path, args, jobs, records, started, overall):
              "CA 为干净测试准确率，ASR 为非目标类攻击节点上的攻击成功率；四项比例指标单位为 %，耗时单位为秒。",
              "攻击入口与 none 分别训练分类器；仅当分类器构造前随机状态、训练输入和超参数均对齐时，才应得到一致结果。缺失指标显示 —，不视为零。", "",
              "方法耗时为预处理、建模、训练和评估的同步计时，不含数据加载和文件写入。检测耗时截止检测/图过滤完成；RIGBD 含初始模型训练，不含检测后的重训。网格总耗时包含全部候选。",
-             "Precision/Recall 在相同训练锚点集合上计算；none、abp、prune 不输出节点检测结果，记为 —。RIGBD 保留原固定数量排序规则，最佳参数按最小 ASR 选择，平局依次选择更小 K、更小 b。", "",
+             "Precision/Recall 在相同训练锚点集合上计算；none、abp、prune 不输出节点检测结果，记为 —。RIGBD 默认根据训练标签推断类别与分界，网格按最高验证准确率选择，平局依次选更小 K、b。",
+             "rigbd 为无自环检测器；rigbd_selfloop 为显式自环探测变体，默认固定 K=20、b=0.5。两者均按消息接收端恢复孤立节点，重训沿用 LoSplit 概率均值目标。", "",
              "| 攻击 | 阶段/方法 | 状态 | CA (%) | ASR (%) | Precision (%) | Recall (%) | 方法耗时(s) | 检测耗时(s) | 网格总耗时(s) | 进程耗时(s) | 最佳参数 | 日志 |",
              "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|"]
     for job in jobs:
@@ -157,7 +168,7 @@ def write_report(path, args, jobs, records, started, overall):
         detection = f"{metrics['DetectionSeconds']:.4f}" if metrics.get('DetectionSeconds') is not None else '—'
         grid = f"{metrics['GridSeconds']:.4f}" if 'GridSeconds' in metrics else "—"
         wall = f"{record['seconds']:.2f}" if 'seconds' in record else "—"
-        parameters = f"K={metrics['K']}, b={metrics['b']}" if method == 'rigbd' and 'K' in metrics else (
+        parameters = f"K={metrics['K']}, b={metrics['b']}" if method in ('rigbd', 'rigbd_selfloop') and 'K' in metrics else (
             f"multiplier={metrics['Multiplier']}, strength={metrics['Strength']}" if 'Multiplier' in metrics else '—')
         lines.append("| " + " | ".join([attack, method, cell(record["status"]),
                      *[percent(metrics, key) for key in ("CA", "ASR", "Precision", "Recall")],
@@ -226,6 +237,12 @@ def main():
     parser.add_argument("--stage", choices=["attack", "defense", "all"], default=SETTINGS["stage"])
     parser.add_argument("--attacks", nargs="+", choices=list(ATTACK_ARGS), default=SETTINGS["attacks"])
     parser.add_argument("--methods", nargs="+", choices=list(METHOD_ARGS), default=SETTINGS["methods"])
+    parser.add_argument('--rigbd-fixed', action='store_true', help='Use fixed K/b instead of the legacy grid')
+    parser.add_argument('--rigbd-k', type=int, default=20)
+    parser.add_argument('--rigbd-b', type=float, default=.5)
+    parser.add_argument('--rigbd-selection', choices=('label_boundary','losplit','fixed_count'), default='label_boundary')
+    parser.add_argument('--rigbd-sampling', choices=('receiver','legacy_source'), default='receiver')
+    parser.add_argument('--rigbd-grid-selection', choices=('validation','min_asr'), default='validation')
     parser.add_argument('--dataset', type=lambda s: {k.lower(): k for k in ('Cora', 'Citeseer', 'Pubmed', 'Physics')}.get(s.lower(), s),
                         choices=['Cora', 'Citeseer', 'Pubmed', 'Physics'], default=SETTINGS['dataset'])
     parser.add_argument('--model', type=lambda s: {k.lower(): k for k in ('GCN', 'GAT', 'GraphSage')}.get(s.lower(), s),

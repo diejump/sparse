@@ -46,8 +46,11 @@ $PruneThreshold = @{ GTA=0.8; UGBA=0.2; DPGBA=0.8 }[$Attack]
 # 作者prune独立防御
 & $py $Entry @Common @Inputs --defense_mode=prune --skip_rigbd "--prune_thr=$PruneThreshold" "--model_save_path=$OutputRoot/$Attack/prune.pth"
 
-# 作者RIGBD：K=20，b=0.5
+# 修正后的无自环RIGBD：K=20，b=0.5
 & $py $Entry @Common @Inputs --defense_mode=none --rigbd_k=20 --rigbd_b=0.5 "--model_save_path=$OutputRoot/$Attack/rigbd.pth"
+
+# 显式自环探测变体（GCN）；与原论文无自环结构分别报告
+& $py $Entry @Common @Inputs --defense_mode=none --rigbd_probe_self_loops --rigbd_k=20 --rigbd_b=0.5 "--model_save_path=$OutputRoot/$Attack/rigbd_selfloop.pth"
 
 # 原ABP：结构投影 + 作者GCN.fit
 & $py $Entry @Common @Inputs --defense_mode=abp "--model_save_path=$OutputRoot/$Attack/abp.pth"
@@ -59,7 +62,10 @@ $PruneThreshold = @{ GTA=0.8; UGBA=0.2; DPGBA=0.8 }[$Attack]
 & $py $Entry @Common @Inputs --defense_mode=abp_assisted "--model_save_path=$OutputRoot/$Attack/abp_assisted.pth"
 ```
 
-`none`保持原RIGBD入口的历史含义：未带`--skip_rigbd`时执行RIGBD；带该开关时运行普通分类器。`prune --skip_rigbd`只运行prune；不带开关时仍会继续作者原RIGBD部分。三个ABP选项自动独立运行。
+`none`保持原RIGBD入口的历史含义：未带`--skip_rigbd`时执行RIGBD；带该开关时运行普通分类器。
+当前统一入口的 `prune` 直接运行图过滤与分类器；ABP 选项也独立运行。
+RIGBD 默认采用训练标签分界和接收端恢复边。自环变体需显式启用，详细诊断见
+`research/rigbd_diagnosis_20261124/REPORT.md`。
 
 三个防御入口读取相同版本2快照，检查外部生成器与快照内权重逐张量一致，并打印快照SHA256。`pre_train_param`在此处是包含固定索引的投毒快照，不是分类器权重。分类器训练分别独立执行。
 

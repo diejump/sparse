@@ -45,12 +45,30 @@ JSON 保存原始比例，Markdown 将 CA、ASR、Precision、Recall 转成百�
 | UGBA | 25, 50, 100 | 0.3, 0.5, 0.7, 0.9 |
 | DPGBA | 2, 5, 25, 50, 100 | 0.1, 0.3, 0.5, 0.7, 0.9 |
 
-最佳参数采用防御后分类器的最小 ASR，平局依次选择更小 K、更小 b。
-该结果表示按评估集 ASR 选出的网格最优值；验证集准确率继续作为候选指标保存。
+2026-11-24 修订后，最佳参数采用防御后分类器的最高验证集准确率，平局依次选择更小 K、更小 b。
+只有显式指定 `--rigbd-grid-selection min_asr` 才按测试 ASR 选择；该选项仅用于回溯诊断。
 最终 Markdown 只展示最佳候选；JSON 元数据保留候选指标与计时以便核对。
 共用的初始检测模型保持固定，不将上一个候选重训后的模型当成下一个候选的检测模型。
-保留原代码按快照标记节点数截取排序结果的规则；这是已知数量条件，解释结果时需注明。
+默认根据排序首节点的训练标签推断目标类别，以首次连续两个异类标签确定严格分界，不读取真实挂接数量。
+`--rigbd-selection losplit` 保留 GTA 已知数量 / UGBA、DPGBA 已知目标类别的对照规则，但修正负下标与分界偏移。
+`--rigbd-selection fixed_count` 是显式使用真实挂接数量的诊断对照，不能当作未知数量检测结果。
 保存的权重对应最佳候选，不是循环的最后一组。
+
+## 稀疏结构诊断与自环变体
+
+原两层无自环检测器对部分叶状结构没有有效的两跳特征传播路径。修复随机数或增加采样次数不能消除该限制。
+`rigbd` 保留无自环结构；新增的 `rigbd_selfloop` 显式开启检测器自环，是单独标记的变体，不等同于原论文结构。
+两种模式都按 PyG 消息接收端 `edge_index[1]` 恢复失去全部邻居的节点，并保留原边权。
+重训仍用 LoSplit 的两个均值损失项，不声称实现了原论文 Eq.6 的对数置信度目标。
+检测器、采样器、恢复分类器使用独立可复现的随机流；元数据记录检测模型状态哈希、选中名单、目标类别 CA。
+
+固定 Cora 图上比较两个模式，不重新生成数据：
+
+```text
+python run_experiments.py --stage defense --dataset Cora --model GCN --methods rigbd rigbd_selfloop --rigbd-fixed --attack-root runs/comparison_inputs_GCN2/Cora/GCN/seed10 --defense-root runs/rigbd_fixed_comparison_new
+```
+
+自环变体当前限定 GCN。完整诊断、作者图复跑、消融和复现记录见 `research/rigbd_diagnosis_20261124/REPORT.md`。
 
 ## 接口与适用范围
 
@@ -70,4 +88,4 @@ JSON 保存原始比例，Markdown 将 CA、ASR、Precision、Recall 转成百�
 - ABP Sparse 参数沿用指定值；其跨数据集与跨模型效果需要服务器实验确认。
   Physics 的特征矩阵和 GAT 中间表示较大，需要结合服务器显存选择运行组合。
 
-本次仅修改代码，执行启动器单元检查和语法检查；没有训练模型、生成新样本或运行完整实验。
+2026-11-24 已执行 Cora/GCN 的固定图实验、作者资产复跑及回归核验；其他数据集/模型未在本次训练验证。

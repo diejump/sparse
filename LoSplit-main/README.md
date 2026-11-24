@@ -35,3 +35,6 @@ If you find this repo helful, please cite our paper. Thank you.
 ## Local ABP integration and fixed-snapshot usage
 
 See [USAGE.md](USAGE.md) for GPU execution, fresh attack generation, fixed-snapshot prune/RIGBD, ABP, abp_dual, abp_assisted, and historical DPGBA replay. Integration details: [ABP_INTEGRATION.md](ABP_INTEGRATION.md).
+
+RIGBD source/input diagnosis, corrected sampling and the explicitly separated GCN self-loop probe variant:
+[Cora verification report, 2026-11-24](research/rigbd_diagnosis_20261124/REPORT.md).

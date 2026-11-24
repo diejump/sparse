@@ -12,6 +12,18 @@ import run_experiments as runner
 
 
 class ReportTests(unittest.TestCase):
+    def test_explicit_selfloop_variant_and_fixed_parameters(self):
+        args = Namespace(stage='defense', attacks=['UGBA'], methods=['rigbd','rigbd_selfloop'],
+                         seed=10, model='GCN', dataset='Cora', attack_root='inputs', defense_root='outputs',
+                         rigbd_fixed=True, rigbd_k=20, rigbd_b=.5)
+        jobs = runner.build_jobs(args)
+        self.assertNotIn('--rigbd_probe_self_loops', jobs[0][2])
+        self.assertIn('--rigbd_probe_self_loops', jobs[1][2])
+        for job in jobs:
+            self.assertNotIn('--rigbd_grid', job[2])
+            self.assertIn('--rigbd_selection=label_boundary', job[2])
+            self.assertIn('--rigbd_sampling=receiver', job[2])
+
     def test_rigbd_selects_minimum_asr_and_stable_ties(self):
         # Load only the pure selector; no torch imports or model execution.
         tree = ast.parse((runner.PROJECT / 'experiment_defenses.py').read_text(encoding='utf-8'))

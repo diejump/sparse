@@ -150,13 +150,8 @@ class GCN(nn.Module):
 
     #RIGBD Finetune
     def finetune1(self, labels, idx_train, idx_val, idx_attach, idx_clean, train_iters, verbose):
-        idx_train_set = set(idx_train)
-        idx_attach_set = set(idx_attach)
-        idx1 = list(idx_train_set - idx_attach_set)
-        idx2 = idx_attach
-
-        idx1 = torch.tensor(idx1).to(self.device)
-        idx2 = torch.tensor(idx2).to(self.device)
+        from rigbd_utils import split_training_nodes, recovery_loss
+        idx1, idx2 = split_training_nodes(idx_train, idx_attach, self.device)
         
 
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
@@ -165,13 +160,7 @@ class GCN(nn.Module):
             self.train()
             optimizer.zero_grad()
             output = self.forward(self.features, self.edge_index, self.edge_weight)
-            loss_train = F.nll_loss(output[idx1], labels[idx1])
-            probs = F.softmax(output[idx2], dim=1)
-            target_probs = probs[range(len(labels[idx2])), labels[idx2]]
-            loss_train_2 = torch.mean(target_probs)  # Mean of probabilities of correct labels
-
-            # Combining the normal and adversarial losses
-            loss_train = loss_train + loss_train_2
+            loss_train = recovery_loss(output, labels, idx1, idx2)
             loss_train.backward()
             optimizer.step()
         self.eval()

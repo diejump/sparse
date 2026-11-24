@@ -1,11 +1,13 @@
 """Shared comparison protocol for the five launcher methods."""
 import json
 import time
+import hashlib
 
 import torch
 import torch.nn.functional as F
 
 from deterministic_runtime import seed_classifier
+from rigbd_utils import sample_edges, select_candidates, split_training_nodes, recovery_loss
 
 
 ORIGINAL_GRIDS = {
@@ -19,15 +21,34 @@ def add_arguments(parser):
     parser.add_argument('--abp_sparse_multiplier', type=float, default=0.95)
     parser.add_argument('--abp_sparse_strength', type=float, default=0.25)
     parser.add_argument('--rigbd_grid', action='store_true')
+    parser.add_argument('--rigbd_probe_self_loops', action='store_true',
+                        help='Explicit self-loop probe variant; not original neighbor-only RIGBD')
+    parser.add_argument('--rigbd_sampling', choices=('receiver', 'legacy_source'), default='receiver')
+    parser.add_argument('--rigbd_selection', choices=('label_boundary', 'losplit', 'fixed_count'),
+                        default='label_boundary', help='Infer target and threshold from training labels by default')
+    parser.add_argument('--rigbd_grid_selection', choices=('validation', 'min_asr'), default='validation',
+                        help='min_asr uses test outcomes and is for retrospective diagnostics only')
 
 
 def log_probabilities(value):
     return value[0] if isinstance(value, tuple) else value
 
 
+def state_hash(model):
+    digest = hashlib.sha256()
+    for key, value in model.state_dict().items():
+        digest.update(key.encode())
+        digest.update(value.detach().cpu().contiguous().numpy().tobytes())
+    return digest.hexdigest()
+
+
 def rigbd_selection_key(row):
     """Maximize this key to choose minimum ASR, then lower K and b."""
     return (-row['ASR'], -row['K'], -row['b'])
+
+
+def rigbd_validation_key(row):
+    return (row['ValidationAccuracy'], -row['K'], -row['b'])
 
 
 def stamp(device):
@@ -49,9 +70,9 @@ def confusion(selected, truth, universe):
 def run_comparison(args, data, device, snapshot, generator, construct, prune):
     """Use training anchors as the common detection population.
 
-    Detection truth is used only for reporting, apart from RIGBD's original
-    fixed-count ranking rule, retained here to match the supplied implementation.
-    Grid selection uses minimum evaluated ASR, with lower K and b for ties.
+    Detection truth is used only for reporting under the default label-boundary
+    rule. Explicit fixed-count/LoSplit reproduction modes record oracle use.
+    Grid selection uses validation accuracy unless min_asr is explicitly requested.
     Seconds excludes loading/serialization and includes training and evaluation.
     DetectionSeconds separately ends at the node decision / graph filter.
     """
@@ -62,6 +83,8 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
     val = snapshot['idx_val']
     truth = snapshot['idx_attach']
     seed = args.seed if args.classifier_seed is None else args.classifier_seed
+    if method == 'rigbd' and getattr(args, 'rigbd_probe_self_loops', False) and args.test_model != 'GCN':
+        raise ValueError('rigbd_selfloop is an explicitly audited GCN probe variant; use --test_model=GCN')
     start = stamp(device)
     # Zero-weight stored arcs are absent edges for topology and random deletion.
     active = weights > 0
@@ -98,6 +121,9 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
             clean = forward(model, x, pe, pw)
             clean_nodes = snapshot['idx_clean_test']
             ca = float(clean[clean_nodes].argmax(1).eq(data.y[clean_nodes]).float().mean())
+            target_nodes = clean_nodes[data.y[clean_nodes] == args.target_class]
+            target_ca = (float(clean[target_nodes].argmax(1).eq(data.y[target_nodes]).float().mean())
+                         if target_nodes.numel() else None)
             tx, te, tw = generator.inject_trigger(snapshot['idx_atk'], x, ce, cw, device)
             te, tw = graph(te.detach(), tw.detach(), tx)
             output = forward(model, tx.detach(), te, tw)
@@ -107,54 +133,87 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
             asr = float(output[nodes].argmax(1).eq(args.target_class).float().mean())
             validation = forward(model, x, train_e, train_w)[val]
             score = float(validation.argmax(1).eq(labels[val]).float().mean())
-        return dict(CA=ca, ASR=asr, ValidationAccuracy=score)
+        return dict(CA=ca, ASR=asr, ValidationAccuracy=score, TargetClassCA=target_ca,
+                    CleanCount=int(clean_nodes.numel()), ASRCount=int(nodes.numel()))
 
     selected = anchors[:0]
     train_e, train_w = graph(edges, weights, x)
     if method == 'rigbd':
-        detector_model = new_model(False)
+        probe_self_loops = getattr(args, 'rigbd_probe_self_loops', False)
+        sampling = getattr(args, 'rigbd_sampling', 'receiver')
+        selection = getattr(args, 'rigbd_selection', 'label_boundary')
+        grid_selection = getattr(args, 'rigbd_grid_selection', 'validation')
+        detector_model = new_model(probe_self_loops)
         detector_model.fit(x, edges, weights, labels, anchors, val,
                            train_iters=args.epochs, verbose=False)
         detector_model.eval()
         with torch.no_grad():
             original = forward(detector_model, x, edges, weights)[anchors].exp()
+        detector_accuracy = float(original.argmax(1).eq(labels[anchors]).float().mean())
+        detector_hash = state_hash(detector_model)
         shared_seconds = stamp(device) - start
         ks, bs = ORIGINAL_GRIDS[snapshot['attack']] if args.rigbd_grid else ([args.rigbd_k], [args.rigbd_b])
         candidates, best, best_state = [], None, None
         for b in bs:
             for k in ks:
                 tick = stamp(device)
-                seed_classifier(seed, args.cuda)
+                # Independent CPU stream: every K uses the same sampling prefix.
+                sampling_generator = torch.Generator(device='cpu').manual_seed(seed)
                 deviations = torch.zeros_like(original)
                 with torch.no_grad():
                     for _ in range(k):
-                        keep = torch.distributions.Bernoulli(1 - b).sample(weights.size()).bool()
-                        noisy_e, noisy_w = edges[:, keep], weights[keep]
-                        degree = torch.zeros(x.size(0), device=device)
-                        degree.index_add_(0, noisy_e[0], x.new_ones(noisy_e.size(1)))
-                        restore = degree[edges[0]] == 0
-                        noisy_e = torch.cat([noisy_e, edges[:, restore]], 1)
-                        noisy_w = torch.cat([noisy_w, x.new_ones(int(restore.sum()))])
+                        noisy_e, noisy_w = sample_edges(
+                            edges, weights, x.size(0), b, sampling_generator,
+                            restore_axis=1 if sampling == 'receiver' else 0)
                         probability = forward(detector_model, x, noisy_e, noisy_w)[anchors].exp()
                         deviations += F.kl_div((probability + 1e-8).log(), original, reduction='none')
-                selected = anchors[deviations.mean(-1).argsort(descending=True)[:truth.numel()]]
+                scores = deviations.mean(-1)
+                rule = selection
+                if rule == 'losplit':
+                    rule = 'fixed_count' if snapshot['attack'] == 'GTA' else 'known_label'
+                selected, decision = select_candidates(
+                    scores, labels, anchors, rule=rule,
+                    target_class=args.target_class if rule == 'known_label' else None,
+                    count=int(truth.numel()) if rule == 'fixed_count' else None)
                 detection_seconds = shared_seconds + stamp(device) - tick
                 classifier = new_model()
-                # Python integer IDs ensure the original set difference compares values.
-                classifier.fit(x, edges, weights, labels, anchors.tolist(), val, train_iters=400,
-                               verbose=False, finetune1=True, attach=selected.tolist())
+                retained, selected_training = split_training_nodes(anchors, selected, device)
+                optimizer = torch.optim.Adam(classifier.parameters(), lr=classifier.lr,
+                                             weight_decay=classifier.weight_decay)
+                for _ in range(400):
+                    classifier.train()
+                    optimizer.zero_grad()
+                    output = forward(classifier, x, edges, weights)
+                    loss = recovery_loss(output, labels, retained, selected_training)
+                    loss.backward()
+                    optimizer.step()
+                classifier.eval()
                 row = dict(K=k, b=b, DetectionSeconds=detection_seconds, **evaluate(classifier))
                 row.update(confusion(selected, truth, anchors))
+                row['FPR'] = row['FP'] / (row['FP'] + row['TN']) if row['FP'] + row['TN'] else None
+                row.update(Decision=decision, SelectedNodes=selected.tolist(),
+                           SelectedCount=int(selected.numel()), ClassifierStateSHA256=state_hash(classifier))
                 row['Seconds'] = shared_seconds + stamp(device) - tick
                 candidates.append(row)
+                if state_hash(detector_model) != detector_hash:
+                    raise RuntimeError('RIGBD detector changed during sampling or recovery')
                 # Stable tie-break: lower K, then lower drop ratio.
-                rank = rigbd_selection_key(row)
+                rank = (rigbd_validation_key(row) if grid_selection == 'validation'
+                        else rigbd_selection_key(row))
                 if best is None or rank > best[0]:
                     best = (rank, row)
                     best_state = {key: value.detach().cpu().clone() for key, value in classifier.state_dict().items()}
         result = dict(best[1], GridSeconds=stamp(device) - start,
-                      SelectionRule='min_ASR_then_lower_K_then_lower_b',
-                      DetectionRule='original_fixed_count', GridResults=candidates)
+                      SelectionRule=('fixed_K_b' if not args.rigbd_grid else
+                          'max_validation_accuracy_then_lower_K_then_lower_b' if grid_selection == 'validation'
+                          else 'min_test_ASR_then_lower_K_then_lower_b'),
+                      DetectionRule=selection, GridResults=candidates,
+                      ProbeSelfLoops=probe_self_loops, SamplingRule=sampling,
+                      DetectorTrainingAccuracy=detector_accuracy,
+                      DetectorStateSHA256=detector_hash, DetectorUnchanged=True,
+                      RecoveryObjective='losplit_mean_NLL_plus_mean_selected_label_probability',
+                      ClassifierSeed=seed, SamplingSeed=seed,
+                      Protocol='selfloop_probe_variant' if probe_self_loops else 'neighbor_only_probe')
         state = best_state
     else:
         detector = None
@@ -191,7 +250,8 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
         result['DetectionSeconds'] = None if method == 'none' else detection_seconds
         result['Seconds'] = stamp(device) - start
         state = classifier.state_dict()
-    result.update(Method=method, Dataset=args.dataset, Model=args.test_model,
+    result.update(Method='rigbd_selfloop' if method == 'rigbd' and probe_self_loops else method,
+                  Dataset=args.dataset, Model=args.test_model,
                   DetectionPopulation='training_anchors', TimeScope='preprocessing_through_training_and_evaluation')
     if args.model_save_path:
         torch.save(state, args.model_save_path)

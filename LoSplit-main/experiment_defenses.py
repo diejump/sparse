@@ -64,6 +64,7 @@ def confusion(selected, truth, universe):
     tn = len(universe - (selected | truth))
     return dict(Precision=tp / (tp + fp) if tp + fp else None,
                 Recall=tp / (tp + fn) if tp + fn else None,
+                FPR=fp / (fp + tn) if fp + tn else None,
                 TP=tp, FP=fp, FN=fn, TN=tn)
 
 
@@ -246,7 +247,7 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
             result.update(Multiplier=args.abp_sparse_multiplier, Strength=args.abp_sparse_strength,
                           Detector=detector.metadata())
         else:
-            result.update(Precision=None, Recall=None)
+            result.update(Precision=None, Recall=None, FPR=None)
         result['DetectionSeconds'] = None if method == 'none' else detection_seconds
         result['Seconds'] = stamp(device) - start
         state = classifier.state_dict()

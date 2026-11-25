@@ -42,7 +42,7 @@ def train_with_detected_labels(model,features,edges,weights,labels,training_node
     if training_nodes.numel()==0 or validation_nodes.numel()==0:
         raise ValueError('Training and validation nodes are required')
     optimizer=torch.optim.Adam(model.parameters(),lr=model.lr,weight_decay=model.weight_decay)
-    best_accuracy=0.
+    best_accuracy=-math.inf
     best_state=None
     history=[]
     best_epoch=None

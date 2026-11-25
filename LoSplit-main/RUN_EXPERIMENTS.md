@@ -5,6 +5,26 @@
 数据集支持 Cora、Citeseer、Pubmed、Physics；分类器支持 GCN、GAT、GraphSage。
 命令行名称不区分大小写。每次调用选择一个数据集和一个分类器。
 
+参考判别版已作为 `abp_reference` 加入可选方法。设置
+`SETTINGS["methods"] = ["abp_reference"]` 后即可使用原启动器。
+四个方法参数为 `abp_reference_multiplier=2.0`、`abp_reference_ratio=0.2`、
+`abp_reference_risk=0.005`、`abp_reference_members=3`。
+固定人数复现可设置 `abp_reference_count=120`，覆盖比例设置。
+默认共训练六个模型；参考随机种子由 `abp_reference_seed` 控制。
+完整说明见 [研究方案与证明](REFERENCE_METHOD.md)、[数据及文献核对](REFERENCE_AUDIT.md)
+和 [本轮结果](REFERENCE_RESULTS.md)。
+
+```text
+python run_experiments.py --stage defense --methods abp_reference --model GCN --attack-root runs/abp_sparse_20261123/seed16/inputs --defense-root runs/my_reference_gcn
+python run_experiments.py --stage defense --methods abp_reference --model GAT --attack-root runs/abp_sparse_20261123/seed16/inputs --defense-root runs/my_reference_gat
+python run_experiments.py --stage defense --methods abp_reference --model GraphSage --attack-root runs/abp_sparse_20261123/seed16/inputs --defense-root runs/my_reference_sage
+```
+
+参数消融入口为 `run_reference_ablation.py`。省略 `--execute` 生成实验清单，
+添加该参数后执行全部已列出的配置，并保存逐次状态、日志及五项指标。
+参考版可添加 `--reference-device cpu` 显式选择 CPU。本机 GAT 在严格确定性模式下
+自动使用 CPU 并记录原因；采用常规 GPU 运算可添加 `--no-deterministic`。
+
 ```bash
 python run_experiments.py --dataset citeseer --model gat
 python run_experiments.py --dataset pubmed --model graphsage
@@ -22,7 +42,7 @@ python run_experiments.py --dataset physics --model gat --dry-run
 ## 结果与计时
 
 输出 `results.md` 和 `results.json`。每个方法的模型旁保存 `.pth.meta.json`。
-JSON 保存原始比例，Markdown 将 CA、ASR、Precision、Recall 转成百分数。
+JSON 保存原始比例，Markdown 将 CA、ASR、Precision、Recall、FPR 转成百分数。
 
 - CA：干净测试集合准确率；ASR：真实类别不等于目标类别的测试集合上的目标类比例。
 - Precision/Recall：在相同的训练锚点集合上，与固定快照的标记集合比较。

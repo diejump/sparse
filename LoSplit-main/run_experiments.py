@@ -16,12 +16,19 @@ name = "GCN4"
 SETTINGS = {
     "stage": "all",                 # attack / defense / all
     "attacks": ["GTA", "UGBA", "DPGBA"],
-    "methods": ["none", "abp", "abp_sparse", "prune", "rigbd","rigbd_selfloop"],
+    "methods": ["none", "abp", "abp_sparse", "abp_reference", "prune", "rigbd","rigbd_selfloop"],
     "dataset": "Cora",              # Cora / Citeseer / Pubmed / Physics
     "model": "GCN",                 # GCN / GAT / GraphSage
     "deterministic": True,
     "abp_sparse_multiplier": 0.95,
     "abp_sparse_strength": 0.25,
+    "abp_reference_multiplier": 2.0,
+    "abp_reference_ratio": 0.2,       # fraction of retained training nodes
+    "abp_reference_count": None,     # explicit count overrides the ratio
+    "abp_reference_risk": 0.005,
+    "abp_reference_members": 3,      # total fitted models = 2 * members
+    "abp_reference_seed": 20261124,
+    "abp_reference_variant": "full",
     "seed": 12,
     "gpu": "0",                     # physical GPU; child uses visible device 0
     "attack_root": f"runs/comparison_inputs_{name}/{{dataset}}/{{model}}/seed{{seed}}",
@@ -47,6 +54,7 @@ METHOD_ARGS = {
     "rigbd_selfloop": ["--defense_mode=none", "--rigbd_probe_self_loops"],
     "abp": ["--defense_mode=abp"],
     "abp_sparse": ["--defense_mode=abp_sparse"],
+    "abp_reference": ["--defense_mode=abp_reference"],
 }
 
 
@@ -62,7 +70,7 @@ def build_jobs(args):
     defense_root = project_path(args.defense_root.format(**substitutions))
     common = (["--deterministic"] if getattr(args, 'deterministic', True) else []) + [f"--dataset={dataset}", "--model=GCN", f"--test_model={model}",
               "--device_id=0", f"--seed={args.seed}", "--hidden=32",
-              "--epochs=200", "--target_class=0"]
+              f"--epochs={getattr(args, 'epochs', 200)}", "--target_class=0"]
     jobs = []
     for attack in args.attacks:
         prefix = "DPGBA/" if attack == "DPGBA" else ""
@@ -88,9 +96,17 @@ def build_jobs(args):
                 if method == "abp_sparse":
                     extra += [f"--abp_sparse_multiplier={getattr(args, 'abp_sparse_multiplier', .95)}",
                               f"--abp_sparse_strength={getattr(args, 'abp_sparse_strength', .25)}"]
+                if method == "abp_reference":
+                    for key in ('multiplier','ratio','count','risk','members','seed','variant'):
+                        value = getattr(args, 'abp_reference_' + key, SETTINGS['abp_reference_' + key])
+                        if value is not None:
+                            extra.append(f'--abp_reference_{key}={value}')
+                    if getattr(args, 'reference_device', None):
+                        extra.append('--device=' + args.reference_device)
                 if method == "prune":
                     extra.append(f"--prune_thr={0.2 if attack == 'UGBA' else 0.8}")
-                jobs.append((f"{attack}/{method}", PROJECT / f"{prefix}{attack}_RIGBD.py",
+                entry = PROJECT / ('reference_experiment.py' if method == 'abp_reference' else f"{prefix}{attack}_RIGBD.py")
+                jobs.append((f"{attack}/{method}", entry,
                              common + ["--train_lr=0.015" if attack == "DPGBA" else "--train_lr=0.01"] + inputs + extra
                              + [f"--model_save_path={output}"],
                              [output, Path(str(output) + '.meta.json')],
@@ -152,13 +168,13 @@ def write_report(path, args, jobs, records, started, overall):
              f"- Python：`{sys.executable}`；物理 GPU：`{args.gpu}`",
              f"- 攻击目录：`{project_path(args.attack_root)}`",
              f"- 防御目录：`{project_path(args.defense_root)}`", "",
-             "CA 为干净测试准确率，ASR 为非目标类攻击节点上的攻击成功率；四项比例指标单位为 %，耗时单位为秒。",
+             "CA 为干净测试准确率，ASR 为非目标类测试节点上的指定类别预测率；五项比例指标单位为 %，耗时单位为秒。",
              "攻击入口与 none 分别训练分类器；仅当分类器构造前随机状态、训练输入和超参数均对齐时，才应得到一致结果。缺失指标显示 —，不视为零。", "",
              "方法耗时为预处理、建模、训练和评估的同步计时，不含数据加载和文件写入。检测耗时截止检测/图过滤完成；RIGBD 含初始模型训练，不含检测后的重训。网格总耗时包含全部候选。",
-             "Precision/Recall 在相同训练锚点集合上计算；none、abp、prune 不输出节点检测结果，记为 —。RIGBD 默认根据训练标签推断类别与分界，网格按最高验证准确率选择，平局依次选更小 K、b。",
+             "Precision、Recall、FPR 在同一训练节点总体上计算；none、abp、prune 的三项检测指标记为 —。RIGBD 默认根据训练标签推断类别与分界，网格按最高验证准确率选择，平局依次选更小 K、b。",
              "rigbd 为无自环检测器；rigbd_selfloop 为显式自环探测变体，默认固定 K=20、b=0.5。两者均按消息接收端恢复孤立节点，重训沿用 LoSplit 概率均值目标。", "",
-             "| 攻击 | 阶段/方法 | 状态 | CA (%) | ASR (%) | Precision (%) | Recall (%) | 方法耗时(s) | 检测耗时(s) | 网格总耗时(s) | 进程耗时(s) | 最佳参数 | 日志 |",
-             "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|"]
+             "| 攻击 | 阶段/方法 | 状态 | CA (%) | ASR (%) | Precision (%) | Recall (%) | FPR (%) | 方法耗时(s) | 检测耗时(s) | 网格总耗时(s) | 进程耗时(s) | 参数 | 日志 |",
+             "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|"]
     for job in jobs:
         name, entry, arguments, outputs, inputs, log = job
         attack, method = name.split("/")
@@ -170,8 +186,12 @@ def write_report(path, args, jobs, records, started, overall):
         wall = f"{record['seconds']:.2f}" if 'seconds' in record else "—"
         parameters = f"K={metrics['K']}, b={metrics['b']}" if method in ('rigbd', 'rigbd_selfloop') and 'K' in metrics else (
             f"multiplier={metrics['Multiplier']}, strength={metrics['Strength']}" if 'Multiplier' in metrics else '—')
+        if method == 'abp_reference' and 'Configuration' in metrics:
+            cfg = metrics['Configuration']
+            parameters = (f"multiplier={cfg['multiplier']}, rho={cfg['ratio']}, m={metrics['ReferenceCount']}, "
+                          f"alpha={cfg['risk']}, M={cfg['members']}, variant={cfg['variant']}")
         lines.append("| " + " | ".join([attack, method, cell(record["status"]),
-                     *[percent(metrics, key) for key in ("CA", "ASR", "Precision", "Recall")],
+                     *[percent(metrics, key) for key in ("CA", "ASR", "Precision", "Recall", "FPR")],
                      elapsed, detection, grid, wall, parameters, link(log) if log.exists() else "—"]) + " |")
     lines += ["", "## 文件与执行记录", "",
               "all 模式按攻击逐个执行：先生成 generator.pth / poison.pt，再将同一对文件传给该攻击的所有防御。",
@@ -250,6 +270,12 @@ def main():
     parser.add_argument('--deterministic', action=argparse.BooleanOptionalAction, default=SETTINGS['deterministic'])
     parser.add_argument('--abp-sparse-multiplier', type=float, default=SETTINGS['abp_sparse_multiplier'])
     parser.add_argument('--abp-sparse-strength', type=float, default=SETTINGS['abp_sparse_strength'])
+    for key, kind in [('multiplier',float),('ratio',float),('count',int),('risk',float),('members',int),('seed',int)]:
+        parser.add_argument('--abp-reference-' + key, type=kind, default=SETTINGS['abp_reference_' + key])
+    parser.add_argument('--abp-reference-variant', choices=['full','no_reference','full_projection','keep_detected_labels'],
+                        default=SETTINGS['abp_reference_variant'])
+    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--reference-device', choices=['cpu','cuda:0'], default=None)
     parser.add_argument("--seed", type=int, default=SETTINGS["seed"])
     parser.add_argument("--gpu", default=SETTINGS["gpu"])
     parser.add_argument("--attack-root", default=SETTINGS["attack_root"])
@@ -261,6 +287,16 @@ def main():
         parser.error('Sparse multiplier must be finite and positive')
     if not math.isfinite(args.abp_sparse_strength) or args.abp_sparse_strength < 0:
         parser.error('Sparse strength must be finite and nonnegative')
+    if args.epochs < 1 or args.abp_reference_members < 1:
+        parser.error('Epochs and reference members must be positive')
+    if not math.isfinite(args.abp_reference_multiplier) or args.abp_reference_multiplier < 1:
+        parser.error('Reference multiplier must be finite and at least one')
+    if not math.isfinite(args.abp_reference_ratio) or not 0 < args.abp_reference_ratio < 1:
+        parser.error('Reference ratio must lie strictly between zero and one')
+    if not math.isfinite(args.abp_reference_risk) or not 0 < args.abp_reference_risk < 1:
+        parser.error('Reference risk must lie strictly between zero and one')
+    if args.abp_reference_count is not None and args.abp_reference_count < 1:
+        parser.error('Reference count must be positive')
     for key in ('attack_root', 'defense_root'):
         setattr(args, key, getattr(args, key).format(dataset=args.dataset, model=args.model, seed=args.seed))
     jobs = build_jobs(args)
@@ -306,9 +342,11 @@ def main():
     overall = "运行中"
     write_report(report, args, jobs, records, started, overall)
     try:
-        subprocess.run([sys.executable, "-c", "import torch; print('torch:', torch.__version__); "
-                        "assert torch.cuda.is_available(), 'CUDA unavailable in this Python environment'; "
-                        "print('GPU:', torch.cuda.get_device_name(0))"],
+        cpu_reference_only = args.stage == 'defense' and set(args.methods) == {'abp_reference'} and args.reference_device == 'cpu'
+        preflight = "import torch; print('torch:', torch.__version__); " + (
+            "print('Device: CPU')" if cpu_reference_only else
+            "assert torch.cuda.is_available(), 'CUDA unavailable in this Python environment'; print('GPU:', torch.cuda.get_device_name(0))")
+        subprocess.run([sys.executable, "-c", preflight],
                        cwd=str(PROJECT), env=env, check=True)
         for job in jobs:
             name = job[0]
@@ -325,7 +363,7 @@ def main():
             finally:
                 record["seconds"] = time.monotonic() - tick
                 record["metrics"] = parse_metrics(job[5], name.split("/")[1])
-                required = {'CA', 'ASR'} if name.endswith('/attack') else {'CA', 'ASR', 'Precision', 'Recall', 'Seconds'}
+                required = {'CA', 'ASR'} if name.endswith('/attack') else {'CA', 'ASR', 'Precision', 'Recall', 'FPR', 'Seconds'}
                 if record["status"] == "成功" and not required <= record["metrics"].keys():
                     record["status"] = "成功（结果指标不完整，请检查日志）"
                 write_report(report, args, jobs, records, started, overall)

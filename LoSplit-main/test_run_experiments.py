@@ -12,6 +12,17 @@ import run_experiments as runner
 
 
 class ReportTests(unittest.TestCase):
+    def test_reference_entry_preserves_backbone_and_configuration(self):
+        for model in ('GCN', 'GAT', 'GraphSage'):
+            args = Namespace(stage='defense', attacks=['GTA','UGBA','DPGBA'], methods=['abp_reference'],
+                seed=10, dataset='Cora', model=model, attack_root='inputs', defense_root='outputs',
+                abp_reference_count=120)
+            for _, entry, flags, _, _, _ in runner.build_jobs(args):
+                self.assertEqual(entry.name, 'reference_experiment.py')
+                self.assertIn('--test_model=' + model, flags)
+                self.assertIn('--abp_reference_count=120', flags)
+                self.assertIn('--abp_reference_members=3', flags)
+
     def test_explicit_selfloop_variant_and_fixed_parameters(self):
         args = Namespace(stage='defense', attacks=['UGBA'], methods=['rigbd','rigbd_selfloop'],
                          seed=10, model='GCN', dataset='Cora', attack_root='inputs', defense_root='outputs',
@@ -46,7 +57,7 @@ class ReportTests(unittest.TestCase):
                     methods=runner.SETTINGS['methods'], seed=10, dataset=dataset, model=model,
                     attack_root='inputs/{dataset}/{model}', defense_root='outputs/{dataset}/{model}')
                 jobs = runner.build_jobs(args)
-                self.assertEqual(len(jobs), 18)
+                self.assertEqual(len(jobs), len(args.attacks) * (1 + len(args.methods)))
                 for name, entry, flags, outputs, inputs, log in jobs:
                     self.assertIn('--dataset=' + dataset, flags)
                     self.assertIn('--test_model=' + model, flags)
@@ -92,6 +103,7 @@ class ReportTests(unittest.TestCase):
 
     def simulate(self, root, failure=None):
         arguments = ["run_experiments.py", "--attacks", "GTA", "--methods", "none", "prune",
+                     "--seed", "10",
                      "--attack-root", str(root / "attacks"), "--defense-root", str(root / "defenses")]
 
         def fake_job(job, env):
@@ -108,7 +120,7 @@ class ReportTests(unittest.TestCase):
             content = ("****After GTA Attack****\nASR: 0.9\nClean Accuracy: 0.8\n"
                        if name.endswith("/attack") else
                        'FINAL_COMPARISON_JSON {"CA":0.8,"ASR":0.1,"Precision":null,'
-                       '"Recall":null,"Seconds":1.25,"DetectionSeconds":null}\n')
+                       '"Recall":null,"FPR":null,"Seconds":1.25,"DetectionSeconds":null}\n')
             log.write_text(content, encoding="utf-8")
 
         with patch("sys.argv", arguments), patch.object(runner.subprocess, "run"), \

@@ -3,8 +3,11 @@
 /runs
 /LoSplit-main/runs
 /LoSplit-main/weights
+/.venv/
+/.uv-cache/
 /LoSplit-main/research
 /LoSplit-main/selected_nodes
 /LoSplit-main/save_selected_feature
 /LoSplit-main/sorted_samples
 /LoSplit-main/weights
+/trigger_attachment_audit_20261125

@@ -14,7 +14,7 @@ import torch
 
 from experiment_defenses import confusion,stamp
 from models.ABP_Reference import load_reference_bundle
-from models.FeatureConsistency import FeatureBranchDetector,restore_features
+from models.FeatureConsistency import FeatureBranchDetector,restore_features,feature_consistency
 from reference_training import ReferenceConfig,fit_reference_method
 from reference_experiment import observed_inputs,load_evaluation_generator,evaluate_reference
 
@@ -47,8 +47,8 @@ def run_feature_snapshot(snapshot_path,output_path,config,device='cpu',generator
     if output_path.exists() or meta_path.exists():raise FileExistsError(output_path)
     snapshot_path=Path(snapshot_path)
     s=torch.load(snapshot_path,map_location=device)
-    if s['snapshot_version']!=2 or s['dataset']!='Cora':
-        raise ValueError('This protocol uses version-2 Cora snapshots with normalized binary features')
+    if s['snapshot_version']!=2:
+        raise ValueError('This protocol requires version-2 snapshots')
     if generator_path:
         external=torch.load(generator_path,map_location='cpu');saved=s['trigger_generator_state']
         if set(external)!=set(saved) or any(not torch.equal(external[k].cpu(),saved[k].cpu()) for k in saved):
@@ -56,6 +56,8 @@ def run_feature_snapshot(snapshot_path,output_path,config,device='cpu',generator
     sha=hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
     print('SNAPSHOT_SHA256: '+sha,flush=True)
     x,e,w,y,anchors,val,ce,cw=observed_inputs(s)
+    if len(feature_consistency(x[val],config.feature_tolerance,'none')['nodes']):
+        raise ValueError('Observed validation features must satisfy the normalized-binary representation')
     device=x.device;started=stamp(device)
     detector=FeatureBranchDetector(config.multiplier,feature_tolerance=config.feature_tolerance,
         use_structure=config.structure_detection,use_features=config.feature_detection,
@@ -100,7 +102,7 @@ def main():
     p.add_argument('--pre_train_param',required=True)
     p.add_argument('--model_save_path',required=True)
     p.add_argument('--trigger_generator_address')
-    p.add_argument('--dataset',choices=['Cora'],default='Cora')
+    p.add_argument('--dataset',choices=['Cora','Citeseer'],default='Cora')
     p.add_argument('--model',default='GCN')
     p.add_argument('--test_model',choices=['GCN','GAT','GraphSage'],default='GCN')
     p.add_argument('--defense_mode',default='abp_feature_reference')

@@ -1,4 +1,4 @@
-"""Launcher adapter for the Cora/GCN feature-consistency reference protocol."""
+"""Launcher for representation-checked reference learning on three backbones."""
 import os
 os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG',':4096:8')
 import argparse
@@ -11,9 +11,9 @@ def main():
     p.add_argument('--pre_train_param',required=True)
     p.add_argument('--trigger_generator_address',required=True)
     p.add_argument('--model_save_path',required=True)
-    p.add_argument('--dataset',choices=['Cora'],default='Cora')
+    p.add_argument('--dataset',choices=['Cora','Citeseer'],default='Cora')
     p.add_argument('--model',default='GCN')
-    p.add_argument('--test_model',choices=['GCN'],default='GCN')
+    p.add_argument('--test_model',choices=['GCN','GAT','GraphSage'],default='GCN')
     p.add_argument('--defense_mode',choices=['abp_feature_reference'],default='abp_feature_reference')
     p.add_argument('--target_class',type=int,default=0)
     p.add_argument('--device_id',type=int,default=0)
@@ -40,7 +40,8 @@ def main():
     cfg=FeatureReferenceConfig(multiplier=a.abp_reference_multiplier,ratio=a.abp_reference_ratio,
         count=a.abp_reference_count,risk=a.abp_reference_risk,reference_seed=a.abp_reference_seed,
         variant=a.abp_reference_variant,members=a.members,classifier_seed=a.seed,hidden=a.hidden,
-        epochs=a.epochs,train_lr=a.train_lr,feature_repair=a.feature_repair,feature_tolerance=a.feature_tolerance)
+        epochs=a.epochs,train_lr=a.train_lr,feature_repair=a.feature_repair,feature_tolerance=a.feature_tolerance,
+        architecture=a.test_model)
     run_feature_snapshot(a.pre_train_param,a.model_save_path,cfg,a.device or f'cuda:{a.device_id}',a.trigger_generator_address)
 
 

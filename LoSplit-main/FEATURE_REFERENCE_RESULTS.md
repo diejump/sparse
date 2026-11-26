@@ -90,7 +90,7 @@ python run_experiments.py --stage defense --attacks GTA UGBA DPGBA SPEAR --metho
 ~~~
 
 默认启用 unique_mode 修复。保留原特征的对照添加 --feature-repair none；三成员比较添加 --feature-members 3。
-当前通用入口按 Cora/GCN 协议校验输入，全部五项指标写入 results.md、results.json 及模型旁的元数据。
+本报告对应原 Cora/GCN 协议，全部五项指标写入 results.md、results.json 及模型旁的元数据。2026-11-26 后续扩展已支持 Cora/Citeseer 与 GCN/GAT/GraphSage，并在运行时核对验证特征表示；新增配对研究、三个参数的候选与表示对照见 GENERALIZATION_RESULTS_20261126.md。
 
 ## 8. 文件
 

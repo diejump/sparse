@@ -12,6 +12,15 @@ import run_experiments as runner
 
 
 class ReportTests(unittest.TestCase):
+
+    def test_range_entry_preserves_backbone_and_three_controls(self):
+        for model in ('GCN','GAT','GraphSage'):
+            args=Namespace(stage='defense',attacks=['GTA','UGBA','DPGBA','SPEAR'],methods=['range_reference'],
+                dataset='Citeseer',model=model,seed=41,attack_root='inputs',defense_root='outputs')
+            for _,entry,flags,_,_,_ in runner.build_jobs(args):
+                self.assertEqual(entry.name,'range_reference_launcher.py')
+                for flag in ('--test_model='+model,'--hidden=32','--train_lr=0.01','--range_gamma=2.0','--range_rho=0.2','--range_alpha=0.005','--device=cpu'):
+                    self.assertIn(flag,flags)
     def test_feature_method_uses_one_frozen_configuration(self):
         args=Namespace(stage='defense',attacks=['GTA','UGBA','DPGBA','SPEAR'],methods=['abp_feature_reference'],
             seed=31,dataset='Cora',model='GCN',attack_root='inputs',defense_root='outputs',feature_repair='none')
@@ -26,7 +35,7 @@ class ReportTests(unittest.TestCase):
 
     def test_spear_author_settings_and_paired_inputs(self):
         for dataset, expected in runner.SPEAR_SETTINGS.items():
-            args = Namespace(stage='all', attacks=['SPEAR'], methods=[m for m in runner.METHOD_ARGS if m!='abp_feature_reference'],
+            args = Namespace(stage='all', attacks=['SPEAR'], methods=[m for m in runner.METHOD_ARGS if m not in ('abp_feature_reference','range_reference')],
                 dataset=dataset, model='GCN', seed=10, attack_root='inputs', defense_root='outputs')
             jobs = runner.build_jobs(args)
             self.assertEqual(len(jobs), 1 + len(args.methods))

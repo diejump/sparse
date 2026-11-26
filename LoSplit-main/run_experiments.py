@@ -12,12 +12,12 @@ import time
 
 
 # IDE users: edit this block and click Run. Paths are relative to this file.
-name = "GCN4"
+name = "GCN7"
 SETTINGS = {
     "stage": "all",                 # attack / defense / all
     "attacks": ["GTA", "UGBA", "DPGBA", "SPEAR"],
-    "methods": ["none", "losplit", "abp", "abp_sparse", "abp_reference", "abp_feature_reference","prune", "rigbd","rigbd_selfloop"],
-    "dataset": "Cora",              # Cora / Citeseer / Pubmed / Physics
+    "methods": ["none", "losplit", "range_reference","prune"],
+    "dataset": "Citeseer",              # Cora / Citeseer / Pubmed / Physics
     "model": "GCN",                 # GCN / GAT / GraphSage
     "deterministic": True,
     "abp_sparse_multiplier": 0.95,
@@ -27,12 +27,12 @@ SETTINGS = {
     "abp_reference_count": None,     # explicit count overrides the ratio
     "abp_reference_risk": 0.005,
     "abp_reference_members": 3,      # total fitted models = 2 * members
-    "abp_reference_seed": 20261124,
+    "abp_reference_seed": 10,
     "abp_reference_variant": "full",
     "feature_members": 1,
     "feature_repair": "unique_mode",
     "feature_tolerance": 1e-6,
-    "seed": 12,
+    "seed": 10,
     "gpu": "0",                     # physical GPU; child uses visible device 0
     "attack_root": f"runs/comparison_inputs_{name}/{{dataset}}/{{model}}/seed{{seed}}",
     "defense_root": f"runs/comparison_outputs_{name}/{{dataset}}/{{model}}/seed{{seed}}",
@@ -82,6 +82,7 @@ METHOD_ARGS = {
     "abp_sparse": ["--defense_mode=abp_sparse"],
     "abp_reference": ["--defense_mode=abp_reference"],
     "abp_feature_reference": ["--defense_mode=abp_feature_reference"],
+    "range_reference": ["--defense_mode=range_reference"],
 }
 
 
@@ -153,12 +154,17 @@ def build_jobs(args):
                     if getattr(args,'reference_device',None):extra.append('--device='+args.reference_device)
                 if method == "prune":
                     extra.append(f"--prune_thr={0.1 if attack == 'SPEAR' else 0.2 if attack == 'UGBA' else 0.8}")
-                entry = PROJECT / ('feature_reference_launcher.py' if method == 'abp_feature_reference' else
+                if method == 'range_reference':
+                    for key,default in [('gamma',2.),('rho',.2),('alpha',.005)]:
+                        extra.append(f"--range_{key}={getattr(args,'range_'+key,default)}")
+                    extra.append('--device='+str(getattr(args,'reference_device',None) or 'cpu'))
+                entry = PROJECT / ('range_reference_launcher.py' if method == 'range_reference' else
+                    'feature_reference_launcher.py' if method == 'abp_feature_reference' else
                     'reference_experiment.py' if method == 'abp_reference' else f"{prefix}{attack}_RIGBD.py")
                 method_common=attack_common
-                if method=='abp_feature_reference':
+                if method in ('abp_feature_reference','range_reference'):
                     method_common=[flag for flag in attack_common if not flag.startswith('--hidden=')]+['--hidden=32']
-                method_lr='--train_lr=0.015' if attack=='DPGBA' and method!='abp_feature_reference' else '--train_lr=0.01'
+                method_lr='--train_lr=0.015' if attack=='DPGBA' and method not in ('abp_feature_reference','range_reference') else '--train_lr=0.01'
                 jobs.append((f"{attack}/{method}", entry,
                              method_common + [method_lr] + inputs + extra
                              + [f"--model_save_path={output}"],
@@ -247,6 +253,8 @@ def write_report(path, args, jobs, records, started, overall):
             parameters = (f"multiplier={cfg['multiplier']}, rho={cfg['ratio']}, m={metrics['ReferenceCount']}, "
                           f"alpha={cfg['risk']}, M={cfg['members']}, variant={cfg['variant']}")
             if method=='abp_feature_reference':parameters+=f", repair={cfg['feature_repair']}"
+        if method=='range_reference' and 'Gamma' in metrics:
+            parameters=f"gamma={metrics['Gamma']}, rho={metrics['Rho']}, alpha={metrics['Alpha']}"
         lines.append("| " + " | ".join([attack, method, cell(record["status"]),
                      *[percent(metrics, key) for key in ("CA", "ASR", "Precision", "Recall", "FPR")],
                      elapsed, detection, grid, wall, parameters, link(log) if log.exists() else "—"]) + " |")
@@ -332,6 +340,9 @@ def main():
     parser.add_argument('--abp-reference-variant', choices=['full','no_reference','full_projection','keep_detected_labels'],
                         default=SETTINGS['abp_reference_variant'])
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--range-gamma',type=float,default=2.)
+    parser.add_argument('--range-rho',type=float,default=.2)
+    parser.add_argument('--range-alpha',type=float,default=.005)
     parser.add_argument('--reference-device', choices=['cpu','cuda:0'], default=None)
     parser.add_argument('--feature-members',type=int,default=SETTINGS['feature_members'])
     parser.add_argument('--feature-repair',choices=['unique_mode','none','clip_normalize'],default=SETTINGS['feature_repair'])
@@ -343,8 +354,12 @@ def main():
     parser.add_argument("--report", default=SETTINGS["report"], help="Markdown report path")
     parser.add_argument("--dry-run", action="store_true", help="Print jobs without importing torch or writing files")
     args = parser.parse_args()
-    if 'abp_feature_reference' in args.methods and (args.dataset!='Cora' or args.model!='GCN'):
-        parser.error('The feature-consistency protocol currently requires Cora and GCN')
+    if not math.isfinite(args.range_gamma) or args.range_gamma<1:
+        parser.error('Range gamma must be finite and at least one')
+    if not all(math.isfinite(v) and 0<v<1 for v in (args.range_rho,args.range_alpha)):
+        parser.error('Range rho and alpha must be finite and in (0,1)')
+    if 'abp_feature_reference' in args.methods and args.dataset not in ('Cora','Citeseer'):
+        parser.error('Feature consistency supports Cora/Citeseer with runtime validation of the feature representation')
     if args.feature_members<1 or not math.isfinite(args.feature_tolerance) or args.feature_tolerance<=0:
         parser.error('Feature members and tolerance must be positive and finite')
     if not math.isfinite(args.abp_sparse_multiplier) or args.abp_sparse_multiplier <= 0:
@@ -406,7 +421,9 @@ def main():
     overall = "运行中"
     write_report(report, args, jobs, records, started, overall)
     try:
-        cpu_reference_only = args.stage == 'defense' and set(args.methods) <= {'abp_reference','abp_feature_reference'} and args.reference_device == 'cpu'
+        cpu_reference_only = args.stage == 'defense' and (
+            set(args.methods)=={'range_reference'} and args.reference_device in (None,'cpu') or
+            set(args.methods) <= {'abp_reference','abp_feature_reference','range_reference'} and args.reference_device == 'cpu')
         preflight = "import torch; print('torch:', torch.__version__); " + (
             "print('Device: CPU')" if cpu_reference_only else
             "assert torch.cuda.is_available(), 'CUDA unavailable in this Python environment'; print('GPU:', torch.cuda.get_device_name(0))")

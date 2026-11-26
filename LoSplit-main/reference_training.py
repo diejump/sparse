@@ -77,7 +77,7 @@ class TensorModel(torch.nn.Module):
 
 def fit_reference_method(features, edges, weights, observed_labels, training_nodes,
                          validation_nodes, config, calibration_edges=None,
-                         calibration_weights=None):
+                         calibration_weights=None, detector=None, feature_transform=None):
     """Fit without evaluation labels, designated class or affected-node identities.
 
     observed_labels contains values only at training_nodes and validation_nodes.
@@ -103,7 +103,8 @@ def fit_reference_method(features, edges, weights, observed_labels, training_nod
     # Materialize the allowed label view; values elsewhere are never used.
     labels = torch.full((len(features),), -1, dtype=torch.long, device=device)
     labels[public_nodes] = public_labels
-    detector = SparseBranchDetector(config.multiplier).fit(features, public_nodes)
+    detector = detector or SparseBranchDetector(config.multiplier)
+    detector.fit(features, public_nodes)
     views = graph_views(detector, features, edges, weights, anchors)
     selected = views['detected'][torch.isin(views['detected'], anchors)]
     retained = anchors[~torch.isin(anchors, selected)]
@@ -125,6 +126,7 @@ def fit_reference_method(features, edges, weights, observed_labels, training_nod
         calibration_edges, calibration_weights = edges, weights
     calibration_view = graph_views(detector, features, calibration_edges, calibration_weights, anchors)
     calibration_e, calibration_w = calibration_view[graph_policy]
+    model_features = feature_transform(features) if feature_transform is not None else features
     if device.type == 'cuda': torch.cuda.synchronize(device)
     detection_seconds = time.perf_counter() - preprocessing_started
     normal_models, recovery_models, thresholds = [], [], []
@@ -133,7 +135,7 @@ def fit_reference_method(features, edges, weights, observed_labels, training_nod
         seed = config.classifier_seed + 10 * member_index
         seed_classifier(seed, device.type == 'cuda')
         normal = build_reference_model(config, config.architecture, features.size(1), nclass, device)
-        normal_history = train_with_detected_labels(TensorModel(normal), features, e, w,
+        normal_history = train_with_detected_labels(TensorModel(normal), model_features, e, w,
             labels, normal_training, clean_validation, anchors[:0], 0., config.epochs)
         normal_models.append(normal)
         recovery = None
@@ -143,10 +145,10 @@ def fit_reference_method(features, edges, weights, observed_labels, training_nod
         if inferred >= 0 and config.variant != 'no_reference':
             seed_classifier(seed, device.type == 'cuda')
             recovery = build_reference_model(config, config.architecture, features.size(1), nclass, device)
-            recovery_history = fit_fixed_epochs(recovery, features, e[:, visible], w[visible],
+            recovery_history = fit_fixed_epochs(recovery, model_features, e[:, visible], w[visible],
                                                  labels, recovery_training, config.epochs)
             with torch.no_grad():
-                output = log_output(recovery(features, calibration_e, calibration_w))
+                output = log_output(recovery(model_features, calibration_e, calibration_w))
             threshold, reference_count = fit_reference_threshold(output, labels, reference, inferred,
                 config.risk, small_sample='infinite')
             recovery_models.append(recovery)
@@ -160,7 +162,8 @@ def fit_reference_method(features, edges, weights, observed_labels, training_nod
             reference_nonclass_count=reference_count))
     model = ABPReferencePredictor(normal_models, recovery_models, detector, anchors, inferred,
         thresholds, graph_policy=graph_policy,
-        decision_rule='ordinary' if config.variant == 'no_reference' else 'all').to(device).eval()
+        decision_rule='ordinary' if config.variant == 'no_reference' else 'all',
+        feature_transform=feature_transform).to(device).eval()
     bundle = dict(version=2, architecture=config.architecture, nfeat=features.size(1), nclass=nclass,
         configuration=asdict(config), members=members, detector=detector.metadata(),
         training_nodes=anchors.cpu(), inferred_class=inferred, graph_policy=graph_policy,

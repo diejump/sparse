@@ -12,12 +12,24 @@ import run_experiments as runner
 
 
 class ReportTests(unittest.TestCase):
+    def test_feature_method_uses_one_frozen_configuration(self):
+        args=Namespace(stage='defense',attacks=['GTA','UGBA','DPGBA','SPEAR'],methods=['abp_feature_reference'],
+            seed=31,dataset='Cora',model='GCN',attack_root='inputs',defense_root='outputs',feature_repair='none')
+        jobs=runner.build_jobs(args)
+        self.assertEqual(len(jobs),4)
+        for _,entry,flags,_,_,_ in jobs:
+            self.assertEqual(entry.name,'feature_reference_launcher.py')
+            self.assertIn('--hidden=32',flags)
+            self.assertIn('--train_lr=0.01',flags)
+            self.assertIn('--members=1',flags)
+            self.assertIn('--feature-repair=none',flags)
+
     def test_spear_author_settings_and_paired_inputs(self):
         for dataset, expected in runner.SPEAR_SETTINGS.items():
-            args = Namespace(stage='all', attacks=['SPEAR'], methods=list(runner.METHOD_ARGS),
+            args = Namespace(stage='all', attacks=['SPEAR'], methods=[m for m in runner.METHOD_ARGS if m!='abp_feature_reference'],
                 dataset=dataset, model='GCN', seed=10, attack_root='inputs', defense_root='outputs')
             jobs = runner.build_jobs(args)
-            self.assertEqual(len(jobs), 1 + len(runner.METHOD_ARGS))
+            self.assertEqual(len(jobs), 1 + len(args.methods))
             generation = jobs[0]
             self.assertEqual(generation[1].name, 'SPEAR_LoSplit.py')
             for key, value in expected.items():

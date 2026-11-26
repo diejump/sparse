@@ -1,5 +1,15 @@
 # 实验入口说明
 
+2026-11-26 新增 `abp_feature_reference`，用于当前 Cora/GCN 的特征一致性检测扩展。
+默认新增自身特征检查并启用共有值修复，训练一个普通模型和一个参考模型。
+四种方式统一使用 hidden=32、train_lr=0.01。该设置与作者各入口的模型宽度设置分别记录。
+使用 `--feature-repair none` 可运行保留原特征的对照，`--feature-members 3` 可比较三成员配置。
+完整定义与证明见 [方法与证明](FEATURE_REFERENCE_THEORY.md)，实测见 [新实验结果](FEATURE_REFERENCE_RESULTS.md)。
+
+```text
+python run_experiments.py --stage defense --attacks GTA UGBA DPGBA SPEAR --methods abp_feature_reference --dataset Cora --model GCN --seed 31 --attack-root runs/feature_reference_20261126/confirmation_inputs/seed31 --defense-root runs/my_feature_reference
+```
+
 修改 `run_experiments.py` 的 `SETTINGS` 后可直接运行。默认方法为
 `none losplit abp abp_sparse abp_reference prune rigbd rigbd_selfloop`，ABP Sparse 的 multiplier=0.95、strength=0.25。
 生成入口支持 GTA、UGBA、DPGBA、SPEAR。SPEAR 与 LoSplit 的复现说明见 [SPEAR_LOSPLIT.md](SPEAR_LOSPLIT.md)。

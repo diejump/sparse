@@ -2,6 +2,8 @@
 
 日期：2026-11-24。对应实现：models/ABP_Reference.py、reference_training.py、reference_experiment.py。
 
+2026-11-26 后续方法：abp_feature_reference 增加原节点自身特征检查与修复。定义、证明和实测分别见 [扩展理论](FEATURE_REFERENCE_THEORY.md) 与 [扩展结果](FEATURE_REFERENCE_RESULTS.md)。本页继续说明原参考版。
+
 2026-11-26 补充：SPEAR 的两份固定快照揭示了现有结构候选的覆盖限制。当前参数范围内训练 Recall 为 0%，放宽标量阈值后的结构上限为 5%。完整核对、共同参数比较及证明见 [SPEAR 诊断报告](SPEAR_ABP_DIAGNOSIS.md)。
 
 ## 资料说明

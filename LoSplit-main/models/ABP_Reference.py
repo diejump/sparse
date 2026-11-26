@@ -69,7 +69,7 @@ class ABPReferencePredictor(nn.Module):
     Normal and recovery ensembles are trained separately with configurable size.
     """
     def __init__(self,normal_models,recovery_models,detector,training_nodes,
-                 inferred_class,thresholds,graph_policy='selective',decision_rule='all'):
+                 inferred_class,thresholds,graph_policy='selective',decision_rule='all',feature_transform=None):
         super().__init__()
         if not normal_models or len(recovery_models)!=len(thresholds):
             raise ValueError('Models and reference thresholds must be provided')
@@ -79,6 +79,7 @@ class ABPReferencePredictor(nn.Module):
         self.inferred_class=int(inferred_class)
         self.graph_policy=graph_policy
         self.decision_rule=decision_rule
+        self.feature_transform=feature_transform
         self.register_buffer('training_nodes',training_nodes.detach().clone())
         self.register_buffer('thresholds',torch.as_tensor(thresholds,dtype=torch.float64))
 
@@ -87,11 +88,12 @@ class ABPReferencePredictor(nn.Module):
         self.eval()
         views=graph_views(self.detector,features,edges,weights,self.training_nodes)
         e,w=views[self.graph_policy]
-        normal=[log_output(model(features,e,w)) for model in self.normal_models]
+        model_features = self.feature_transform(features) if self.feature_transform is not None else features
+        normal=[log_output(model(model_features,e,w)) for model in self.normal_models]
         ordinary=torch.stack([z.exp() for z in normal]).mean(0)
         if self.inferred_class < 0 or not self.recovery_models or self.decision_rule == 'ordinary':
             return ordinary.argmax(1)
-        recovery=[log_output(model(features,e,w)) for model in self.recovery_models]
+        recovery=[log_output(model(model_features,e,w)) for model in self.recovery_models]
         recovered=torch.stack([z.exp() for z in recovery]).mean(0)
         accepted=torch.stack([class_margin(z,self.inferred_class)>threshold
             for z,threshold in zip(recovery,self.thresholds)]).all(0)
@@ -108,7 +110,7 @@ def load_reference_bundle(path,device='cpu'):
     from types import SimpleNamespace
     from .ABP_Sparse import SparseBranchDetector
     bundle=torch.load(path,map_location=device)
-    if bundle.get('version') not in (1, 2):
+    if bundle.get('version') not in (1, 2, 3):
         raise ValueError('Unsupported reference bundle version')
     config=SimpleNamespace(**bundle['configuration'])
     normal=[];recovery=[];thresholds=[]
@@ -124,11 +126,20 @@ def load_reference_bundle(path,device='cpu'):
         if member['recovery'] is not None:
             thresholds.append(member['threshold'])
     det=bundle['detector']
-    detector=SparseBranchDetector(det['margin'],det['threshold'])
+    feature_transform=None
+    if bundle.get('version')==3:
+        from functools import partial
+        from .FeatureConsistency import FeatureBranchDetector,restore_features
+        detector=FeatureBranchDetector(det['margin'],det['threshold'],
+            feature_tolerance=det['feature_tolerance'],use_structure=det['use_structure'],
+            use_features=det['use_features'],structural_gate=det.get('structural_gate','abp'))
+        feature_transform=partial(restore_features,tolerance=bundle['feature_tolerance'],repair=bundle['feature_repair'])
+    else:
+        detector=SparseBranchDetector(det['margin'],det['threshold'])
     detector.reference_max=det['reference_max'];detector.reference_count=det['reference_count']
     return ABPReferencePredictor(normal,recovery,detector,bundle['training_nodes'],
         bundle['inferred_class'],thresholds,bundle.get('graph_policy','selective'),
-        bundle.get('decision_rule','all')).to(device).eval()
+        bundle.get('decision_rule','all'),feature_transform=feature_transform).to(device).eval()
 
 
 def build_reference_model(config, architecture, nfeat, nclass, device):

@@ -21,6 +21,9 @@ ROOT = Path(__file__).resolve().parent
 
 
 def load_evaluation_generator(snapshot, device):
+    if snapshot['attack'] == 'SPEAR':
+        from spear_snapshot import load_spear_generator
+        return load_spear_generator(snapshot, device)
     filename = {'GTA': 'models/GTA.py', 'UGBA': 'models/backdoor_UGBA.py',
                 'DPGBA': 'DPGBA/models/backdoor.py'}[snapshot['attack']]
     spec = importlib.util.spec_from_file_location('reference_eval_' + snapshot['attack'], ROOT / filename)

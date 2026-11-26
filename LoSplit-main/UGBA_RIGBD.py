@@ -102,7 +102,7 @@ parser.add_argument('--vs_number', type=int, default=40,
 
 # defense setting
 parser.add_argument('--defense_mode', type=str, default="none",
-                    choices=['prune', 'isolate', 'none', 'reconstruct', 'abp','abp_sparse','abp_dual','abp_assisted'],
+                    choices=['prune', 'isolate', 'none', 'reconstruct', 'abp','losplit','abp_sparse','abp_dual','abp_assisted'],
                     help="Mode of defense")
 parser.add_argument('--prune_thr', type=float, default=0.2,
                     help="Threshold of prunning edges")
@@ -317,7 +317,7 @@ print('GENERATOR_MATCHES_SNAPSHOT: True')
 # edge_weight = torch.ones([data.edge_index.shape[1]],device=device,dtype=torch.float)
 
 # ===== 固定快照加载结束，继续作者原防御代码 =====
-if args.defense_mode in ('none', 'abp', 'abp_sparse', 'prune'):
+if args.defense_mode in ('none', 'losplit', 'abp', 'abp_sparse', 'prune'):
     run_comparison(args, data, device, poison_snapshot, model, model_construct, prune_unrelated_edge)
     raise SystemExit(0)
 if args.defense_mode == 'abp':

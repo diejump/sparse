@@ -15,8 +15,8 @@ import time
 name = "GCN4"
 SETTINGS = {
     "stage": "all",                 # attack / defense / all
-    "attacks": ["GTA", "UGBA", "DPGBA"],
-    "methods": ["none", "abp", "abp_sparse", "abp_reference", "prune", "rigbd","rigbd_selfloop"],
+    "attacks": ["GTA", "UGBA", "DPGBA", "SPEAR"],
+    "methods": ["none", "losplit", "abp", "abp_sparse", "abp_reference", "prune", "rigbd","rigbd_selfloop"],
     "dataset": "Cora",              # Cora / Citeseer / Pubmed / Physics
     "model": "GCN",                 # GCN / GAT / GraphSage
     "deterministic": True,
@@ -46,9 +46,32 @@ ATTACK_ARGS = {
               "--vs_number=50", "--k=50", "--outter_size=4096",
               "--selection_method=none", "--weight_target=1", "--weight_ood=1",
               "--weight_targetclass=2", "--split_lr=0.01", "--split_epoch=15", "--gamma=1.0"],
+    "SPEAR": [],  # Dataset-specific author settings below.
+}
+# Values transcribed from the original defense.sh, including SPEAR's width.
+SPEAR_SETTINGS = {
+    "Cora": dict(hidden=80, vs_number=50, homo_loss_weight=.1, target_loss_weight=1,
+                 alpha_int=30, shadow_lr=.0002, trojan_lr=.0002, target_class=0),
+    "Citeseer": dict(hidden=64, vs_number=47, homo_loss_weight=.05, target_loss_weight=1,
+                     alpha_int=10, shadow_lr=.0002, trojan_lr=.0002, target_class=0),
+    "Pubmed": dict(hidden=64, vs_number=222, homo_loss_weight=.15, target_loss_weight=2,
+                   alpha_int=10, shadow_lr=.005, trojan_lr=.005, target_class=2),
+    "Physics": dict(hidden=64, vs_number=207, homo_loss_weight=.15, target_loss_weight=2,
+                    alpha_int=15, shadow_lr=.0005, trojan_lr=.0005, target_class=0),
+}
+LOSPLIT_SETTINGS = {
+    "GTA": {"Cora": (.01, 10, .3), "Citeseer": (.05, 10, .45),
+            "Pubmed": (.005, 15, .55), "Physics": (.00001, 20, .55)},
+    "UGBA": {"Cora": (.01, 15, .2), "Citeseer": (.01, 10, .45),
+             "Pubmed": (.03, 15, 0.), "Physics": (.001, 10, 0.)},
+    "DPGBA": {"Cora": (.01, 15, 1.), "Citeseer": (.01, 10, .85),
+              "Pubmed": (.01, 40, 1.), "Physics": (.0001, 20, .4)},
+    "SPEAR": {"Cora": (.008, 10, .05), "Citeseer": (.08, 20, .8),
+              "Pubmed": (.03, 15, .8), "Physics": (.001, 20, .7)},
 }
 METHOD_ARGS = {
     "none": ["--defense_mode=none", "--skip_rigbd"],
+    "losplit": ["--defense_mode=losplit"],
     "prune": ["--defense_mode=prune", "--skip_rigbd"],
     "rigbd": ["--defense_mode=none", "--rigbd_grid"],
     "rigbd_selfloop": ["--defense_mode=none", "--rigbd_probe_self_loops"],
@@ -73,18 +96,31 @@ def build_jobs(args):
               f"--epochs={getattr(args, 'epochs', 200)}", "--target_class=0"]
     jobs = []
     for attack in args.attacks:
+        attack_common = common.copy()
+        attack_flags = ATTACK_ARGS[attack].copy()
+        if attack == "SPEAR":
+            settings = SPEAR_SETTINGS[dataset]
+            attack_common = [flag for flag in common
+                             if not flag.startswith(('--hidden=', '--target_class='))]
+            attack_common += [f"--hidden={settings['hidden']}", f"--target_class={settings['target_class']}"]
+            attack_flags = [f"--{key}={value}" for key, value in settings.items()
+                            if key not in ('hidden', 'target_class')]
+            attack_flags += ["--train_lr=0.01", "--trojan_epochs=200", "--outter_size=512"]
         prefix = "DPGBA/" if attack == "DPGBA" else ""
         generator = attack_root / attack / "generator.pth"
         snapshot = attack_root / attack / "poison.pt"
         inputs = [f"--trigger_generator_address={generator}", f"--pre_train_param={snapshot}"]
         if args.stage in ("attack", "all"):
             jobs.append((f"{attack}/attack", PROJECT / f"{prefix}{attack}_LoSplit.py",
-                         common + ATTACK_ARGS[attack] + inputs,
+                         attack_common + attack_flags + inputs,
                          [generator, snapshot], [], attack_root / attack / "attack.log"))
         if args.stage in ("defense", "all"):
             for method in args.methods:
                 output = defense_root / attack / f"{method}.pth"
                 extra = METHOD_ARGS[method].copy()
+                if method == 'losplit':
+                    lr, epochs, gamma = LOSPLIT_SETTINGS[attack][dataset]
+                    extra += [f'--split_lr={lr}', f'--split_epoch={epochs}', f'--gamma={gamma}']
                 if method in ('rigbd', 'rigbd_selfloop'):
                     if getattr(args, 'rigbd_fixed', False):
                         extra = [flag for flag in extra if flag != '--rigbd_grid']
@@ -104,10 +140,10 @@ def build_jobs(args):
                     if getattr(args, 'reference_device', None):
                         extra.append('--device=' + args.reference_device)
                 if method == "prune":
-                    extra.append(f"--prune_thr={0.2 if attack == 'UGBA' else 0.8}")
+                    extra.append(f"--prune_thr={0.1 if attack == 'SPEAR' else 0.2 if attack == 'UGBA' else 0.8}")
                 entry = PROJECT / ('reference_experiment.py' if method == 'abp_reference' else f"{prefix}{attack}_RIGBD.py")
                 jobs.append((f"{attack}/{method}", entry,
-                             common + ["--train_lr=0.015" if attack == "DPGBA" else "--train_lr=0.01"] + inputs + extra
+                             attack_common + ["--train_lr=0.015" if attack == "DPGBA" else "--train_lr=0.01"] + inputs + extra
                              + [f"--model_save_path={output}"],
                              [output, Path(str(output) + '.meta.json')],
                              [generator, snapshot], output.with_suffix(".log")))
@@ -186,6 +222,9 @@ def write_report(path, args, jobs, records, started, overall):
         wall = f"{record['seconds']:.2f}" if 'seconds' in record else "—"
         parameters = f"K={metrics['K']}, b={metrics['b']}" if method in ('rigbd', 'rigbd_selfloop') and 'K' in metrics else (
             f"multiplier={metrics['Multiplier']}, strength={metrics['Strength']}" if 'Multiplier' in metrics else '—')
+        if method == 'losplit' and 'SplitLR' in metrics:
+            parameters = (f"split_lr={metrics['SplitLR']}, split_epoch={metrics['SplitEpochs']}, "
+                          f"gamma={metrics['Gamma']}, selected_epoch={metrics['BestSplitEpoch']}")
         if method == 'abp_reference' and 'Configuration' in metrics:
             cfg = metrics['Configuration']
             parameters = (f"multiplier={cfg['multiplier']}, rho={cfg['ratio']}, m={metrics['ReferenceCount']}, "

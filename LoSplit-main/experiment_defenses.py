@@ -1,4 +1,4 @@
-"""Shared comparison protocol for the five launcher methods."""
+"""Shared comparison protocol for the launcher methods."""
 import json
 import time
 import hashlib
@@ -14,10 +14,16 @@ ORIGINAL_GRIDS = {
     'GTA': ([10, 20, 25, 50], [0.3, 0.5, 0.7, 0.9]),
     'UGBA': ([25, 50, 100], [0.3, 0.5, 0.7, 0.9]),
     'DPGBA': ([2, 5, 25, 50, 100], [0.1, 0.3, 0.5, 0.7, 0.9]),
+    'SPEAR': ([50, 100], [0.5, 0.7, 0.9]),
 }
 
 
 def add_arguments(parser):
+    for name, kind in (('split_lr', float), ('split_epoch', int), ('gamma', float)):
+        if '--' + name not in parser._option_string_actions:
+            parser.add_argument('--' + name, type=kind, default=None)
+        else:
+            parser.set_defaults(**{name: None})
     parser.add_argument('--abp_sparse_multiplier', type=float, default=0.95)
     parser.add_argument('--abp_sparse_strength', type=float, default=0.25)
     parser.add_argument('--rigbd_grid', action='store_true')
@@ -80,7 +86,9 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
     method = 'rigbd' if args.defense_mode == 'none' and not args.skip_rigbd else args.defense_mode
     x, edges, weights, labels = [snapshot[k] for k in
         ('poison_x', 'poison_edge_index', 'poison_edge_weights', 'poison_labels')]
-    anchors = torch.cat([snapshot['idx_train'], snapshot['idx_attach']]).unique(sorted=True)
+    anchors = torch.cat([snapshot['idx_train'], snapshot['idx_attach']])
+    if method != 'losplit':
+        anchors = anchors.unique(sorted=True)
     val = snapshot['idx_val']
     truth = snapshot['idx_attach']
     seed = args.seed if args.classifier_seed is None else args.classifier_seed
@@ -88,8 +96,9 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
         raise ValueError('rigbd_selfloop is an explicitly audited GCN probe variant; use --test_model=GCN')
     start = stamp(device)
     # Zero-weight stored arcs are absent edges for topology and random deletion.
-    active = weights > 0
-    edges, weights = edges[:, active], weights[active]
+    if method != 'losplit':
+        active = weights > 0
+        edges, weights = edges[:, active], weights[active]
     from models.ABP import filter_edges
     if method == 'abp_sparse':
         from models.ABP_Sparse import project_graph
@@ -103,6 +112,8 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
         return log_probabilities(model(features, e, w))
 
     def graph(e, w, features):
+        if method == 'losplit':
+            return e, w
         active = w > 0
         e, w = e[:, active], w[active]
         if method == 'abp':
@@ -139,7 +150,42 @@ def run_comparison(args, data, device, snapshot, generator, construct, prune):
 
     selected = anchors[:0]
     train_e, train_w = graph(edges, weights, x)
-    if method == 'rigbd':
+    if method == 'losplit':
+        from run_experiments import LOSPLIT_SETTINGS
+        defaults = LOSPLIT_SETTINGS[snapshot['attack']][args.dataset]
+        split_lr, split_epoch, gamma = [default if getattr(args, key, None) is None else getattr(args, key)
+            for key, default in zip(('split_lr', 'split_epoch', 'gamma'), defaults)]
+        if split_epoch < 2 or split_lr <= 0 or not 0 <= gamma <= 1:
+            raise ValueError('LoSplit requires split_epoch >= 2, split_lr > 0 and gamma in [0,1]')
+        seed_classifier(seed, args.cuda)
+        splitter = construct(args, 'LoSplit', data, device, split_lr=split_lr).to(device)
+        poison_found, clean_found, deltas, targets = splitter.fit(
+            x, train_e, train_w, labels, anchors, val, train_iters=args.epochs,
+            verbose=False, split_epoch=split_epoch, num_attach=len(truth))
+        # Author entry: discard the initial (untrained) split, maximize the gap.
+        best_delta = max(deltas[1:])
+        best_t = next(i for i, delta in enumerate(deltas) if delta == best_delta)
+        selected, retained = poison_found[best_t], clean_found[best_t]
+        target = int(targets[best_t])
+        detection_seconds = stamp(device) - start
+        # Continue the RNG stream from the splitting stage, as in the author entry.
+        classifier = construct(args, args.test_model, data, device).to(device)
+        classifier.fit(x, train_e, train_w, labels.clone(), anchors, val,
+            train_iters=args.epochs, verbose=False, finetune2=True,
+            attach=selected, clean=retained, target_label=target, gamma=gamma)
+        result = evaluate(classifier)
+        result.update(confusion(selected, truth, anchors))
+        result.update(SplitLR=split_lr, SplitEpochs=split_epoch, Gamma=gamma,
+            BestSplitEpoch=best_t, BestDelta=float(best_delta), InferredClass=target,
+            SelectedNodes=selected.detach().cpu().tolist(),
+            RetainedNodes=retained.detach().cpu().tolist(),
+            SplitHistory=[dict(Epoch=i, Delta=float(delta), InferredClass=int(targets[i]),
+                               SelectedCount=int(poison_found[i].numel()))
+                          for i, delta in enumerate(deltas)],
+            ClassifierSeed=seed, Protocol='author_RCE_GMM_then_finetune2',
+            DetectionSeconds=detection_seconds, Seconds=stamp(device) - start)
+        state = classifier.state_dict()
+    elif method == 'rigbd':
         probe_self_loops = getattr(args, 'rigbd_probe_self_loops', False)
         sampling = getattr(args, 'rigbd_sampling', 'receiver')
         selection = getattr(args, 'rigbd_selection', 'label_boundary')

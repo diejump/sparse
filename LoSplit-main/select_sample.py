@@ -64,6 +64,7 @@ def sort(data, args, idx_train, idx_val, device):
         os.makedirs(save_dir)
     
     file_path = os.path.join(save_dir, f"{args.dataset}/sorted_samples.pt")
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     
     torch.save(sorted_samples, file_path)
     
@@ -82,4 +83,4 @@ def select(data, args, idx_train, idx_val, device):
         selected_samples = sort(data, args, idx_train, idx_val, device)
     budget = args.vs_number
     selected_samples = selected_samples[:budget]
-    return selected_samples    
+    return selected_samples

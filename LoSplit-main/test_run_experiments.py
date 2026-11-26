@@ -12,6 +12,38 @@ import run_experiments as runner
 
 
 class ReportTests(unittest.TestCase):
+    def test_spear_author_settings_and_paired_inputs(self):
+        for dataset, expected in runner.SPEAR_SETTINGS.items():
+            args = Namespace(stage='all', attacks=['SPEAR'], methods=list(runner.METHOD_ARGS),
+                dataset=dataset, model='GCN', seed=10, attack_root='inputs', defense_root='outputs')
+            jobs = runner.build_jobs(args)
+            self.assertEqual(len(jobs), 1 + len(runner.METHOD_ARGS))
+            generation = jobs[0]
+            self.assertEqual(generation[1].name, 'SPEAR_LoSplit.py')
+            for key, value in expected.items():
+                self.assertIn(f'--{key}={value}', generation[2])
+            self.assertIn('--trojan_epochs=200', generation[2])
+            for _, entry, flags, _, inputs, _ in jobs[1:]:
+                self.assertTrue(entry.is_file())
+                self.assertEqual(inputs, generation[3])
+                self.assertEqual(sum(f.startswith('--hidden=') for f in flags), 1)
+                self.assertIn(f"--hidden={expected['hidden']}", flags)
+                self.assertIn(f"--target_class={expected['target_class']}", flags)
+
+    def test_losplit_author_settings_for_every_entry(self):
+        for dataset in ('Cora', 'Citeseer', 'Pubmed', 'Physics'):
+            args = Namespace(stage='defense', attacks=list(runner.ATTACK_ARGS), methods=['losplit'],
+                dataset=dataset, model='GCN', seed=10, attack_root='inputs', defense_root='outputs')
+            for name, entry, flags, outputs, inputs, _ in runner.build_jobs(args):
+                attack = name.split('/')[0]
+                lr, epochs, gamma = runner.LOSPLIT_SETTINGS[attack][dataset]
+                self.assertEqual(entry.name, attack + '_RIGBD.py')
+                self.assertIn('--defense_mode=losplit', flags)
+                for key, value in [('split_lr', lr), ('split_epoch', epochs), ('gamma', gamma)]:
+                    self.assertIn(f'--{key}={value}', flags)
+                self.assertEqual(len(outputs), 2)
+                self.assertEqual(len(inputs), 2)
+
     def test_reference_entry_preserves_backbone_and_configuration(self):
         for model in ('GCN', 'GAT', 'GraphSage'):
             args = Namespace(stage='defense', attacks=['GTA','UGBA','DPGBA'], methods=['abp_reference'],

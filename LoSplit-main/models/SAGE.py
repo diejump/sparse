@@ -128,7 +128,7 @@ class GraphSage(nn.Module):
         mask = torch.zeros_like(labels, dtype=torch.bool)
         mask[idx_attach] = 1  
         choices = torch.tensor([i for i in range(num_classes) if i != target_label])
-        random_replacements = choices[torch.randint(0, len(choices), size=(mask.sum(),))]
+        random_replacements = choices[torch.randint(0, len(choices), size=(mask.sum(),))].to(labels.device)
         reshuffle_labels = labels
         reshuffle_labels[mask] = random_replacements        
 

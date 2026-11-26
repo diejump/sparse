@@ -44,7 +44,7 @@ python run_experiments.py --stage defense --attacks DPGBA --methods abp_dual
 
 ## 分类器独立随机种子
 
-GTA、UGBA、DPGBA 的 LoSplit/RIGBD 两类入口在启动时保留原有全局种子/确定性设置，
+GTA、UGBA、DPGBA、SPEAR 的 LoSplit/RIGBD 两类入口在启动时保留原有全局种子/确定性设置，
 并在评估分类器构造前额外调用 `seed_classifier`，重置 Python、NumPy、PyTorch CPU/CUDA RNG。
 默认分类器种子等于 `--seed`，所以现有启动器无需新增参数。
 如直接调用两个入口，也可给两边传入相同的 `--classifier_seed=123`。
@@ -54,7 +54,7 @@ classifier_seed 可以不同于全局 seed，不要求修改进程启动时的 P
 并加载同一份投毒图/生成器。none 需使用 `--defense_mode=none --skip_rigbd`。
 新规则不会复现修改前的历史攻击评估数值，需要重新运行攻击评估。
 只把防御入口的全局种子设置移动到 GCN 前，并不能使它对齐旧攻击入口。
-三个攻击均已接入；重置位置与 UGBA 一致，位于攻击评估分类器和防御入口的
+四个算法均已接入；重置位置与 UGBA 一致，位于攻击评估分类器和防御入口的
 none/prune/ABP 分类器构造前。RIGBD 的检测与恢复模型也分别使用独立分类器种子，
 删边使用独立 CPU 生成器，不依赖前一个候选的训练调用数。
 
@@ -75,3 +75,7 @@ epochs、dropout、生成阶段学习率、挂接节点预算及目标类别保�
 
 启动器不安装依赖。实际运行前会检查当前解释器中的 PyTorch/CUDA；严格确定性已审计
 范围仍为 Cora/GCN，跨平台数值一致性需在目标环境另行验证。
+
+## SPEAR 与 LoSplit
+
+SPEAR 已支持全部统一防御选项；`losplit` 已支持四种固定快照。参数、命令与 Cora 实测见 [SPEAR_LOSPLIT.md](SPEAR_LOSPLIT.md)。

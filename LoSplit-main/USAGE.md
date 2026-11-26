@@ -84,7 +84,7 @@ New-Item -ItemType Directory -Force -Path "$NewInputs/GTA","$NewInputs/UGBA","$N
 & $py DPGBA/DPGBA_LoSplit.py --dataset=Cora --test_model=GCN --device_id=0 --seed=10 --vs_number=50 --k=50 --hidden=32 --weight_target=1 --weight_ood=1 --weight_targetclass=2 --train_lr=0.015 --lr=0.015 --target_class=0 --trojan_epochs=300 --epochs=200 "--trigger_generator_address=$NewInputs/DPGBA/generator.pth" "--pre_train_param=$NewInputs/DPGBA/poison.pt" --split_lr=0.01 --split_epoch=15 --gamma=1.0
 ```
 
-生成后，将第2节 `$InputRoot` 改为 `$NewInputs`。当前攻击入口在攻击评估后保存快照；作者LoSplit额外恢复部分保持现有停用状态。DPGBA还会按原代码写出仓库根目录`model_weights.pth`；需要保留该文件时，先复制备份。
+生成后，将第2节 `$InputRoot` 改为 `$NewInputs`。当前攻击入口在攻击评估后保存快照；LoSplit 动态分割与恢复训练通过 `run_experiments.py --methods losplit` 独立执行，详见 `SPEAR_LOSPLIT.md`。DPGBA还会按原代码写出仓库根目录`model_weights.pth`；需要保留该文件时，先复制备份。
 
 干净参考模型单独运行：
 

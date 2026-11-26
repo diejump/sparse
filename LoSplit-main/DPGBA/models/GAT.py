@@ -93,13 +93,13 @@ class GAT(nn.Module):
         mask = torch.zeros_like(labels, dtype=torch.bool)
         mask[idx_attach] = 1  
         choices = torch.tensor([i for i in range(num_classes) if i != target_label])
-        random_replacements = choices[torch.randint(0, len(choices), size=(mask.sum(),))]
+        random_replacements = choices[torch.randint(0, len(choices), size=(mask.sum(),))].to(labels.device)
         reshuffle_labels = labels
         reshuffle_labels[mask] = random_replacements  
         for i in range(train_iters): 
             self.train()
             optimizer.zero_grad()
-            output, x = self.forward(self.features, self.edge_index, self.edge_weight)
+            output = self.forward(self.features, self.edge_index, self.edge_weight)
             loss_attach_forget = -1 * F.nll_loss(output[idx_attach], labels[idx_attach], reduction='none')
             loss_attach_forget = torch.relu(loss_attach_forget)
             loss_attach_decouple =  F.nll_loss(output[idx_attach], reshuffle_labels[idx_attach], reduction='none')

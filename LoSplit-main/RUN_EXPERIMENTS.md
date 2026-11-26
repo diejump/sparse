@@ -1,7 +1,8 @@
 # 实验入口说明
 
 修改 `run_experiments.py` 的 `SETTINGS` 后可直接运行。默认方法为
-`none abp abp_sparse prune rigbd`，ABP Sparse 的 multiplier=0.95、strength=0.25。
+`none losplit abp abp_sparse abp_reference prune rigbd rigbd_selfloop`，ABP Sparse 的 multiplier=0.95、strength=0.25。
+生成入口支持 GTA、UGBA、DPGBA、SPEAR。SPEAR 与 LoSplit 的复现说明见 [SPEAR_LOSPLIT.md](SPEAR_LOSPLIT.md)。
 数据集支持 Cora、Citeseer、Pubmed、Physics；分类器支持 GCN、GAT、GraphSage。
 命令行名称不区分大小写。每次调用选择一个数据集和一个分类器。
 
@@ -64,6 +65,7 @@ JSON 保存原始比例，Markdown 将 CA、ASR、Precision、Recall、FPR 转�
 | GTA | 10, 20, 25, 50 | 0.3, 0.5, 0.7, 0.9 |
 | UGBA | 25, 50, 100 | 0.3, 0.5, 0.7, 0.9 |
 | DPGBA | 2, 5, 25, 50, 100 | 0.1, 0.3, 0.5, 0.7, 0.9 |
+| SPEAR | 50, 100 | 0.5, 0.7, 0.9 |
 
 2026-11-24 修订后，最佳参数采用防御后分类器的最高验证集准确率，平局依次选择更小 K、更小 b。
 只有显式指定 `--rigbd-grid-selection min_asr` 才按测试 ASR 选择；该选项仅用于回溯诊断。

@@ -1,3 +1,7 @@
+import os
+from pathlib import Path
+from deterministic_runtime import prepare_environment, configure_determinism, seed_classifier
+prepare_environment()
 import argparse
 import numpy as np
 import torch
@@ -19,6 +23,8 @@ import pandas as pd
 
 # Training settings
 parser = argparse.ArgumentParser()
+parser.add_argument('--deterministic', action='store_true')
+parser.add_argument('--classifier_seed', type=int, default=None)
 parser.add_argument('--debug', action='store_true',
         default=True, help='debug mode')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -118,15 +124,20 @@ parser.add_argument('--attack', type=str, default='SPEAR',
                     help="attack type")
 
 
-args = parser.parse_known_args()[0]
+args = parser.parse_args()
 args.cuda =  not args.no_cuda and torch.cuda.is_available()
-device = torch.device(('cuda:{}' if torch.cuda.is_available() else 'cpu').format(args.device_id))
+device = torch.device('cuda:{}'.format(args.device_id) if args.cuda else 'cpu')
+if args.deterministic:
+    configure_determinism(args.seed, args.cuda)
+for output_path in (args.trigger_generator_address, args.pre_train_param):
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 print(args)
 
 
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
-torch.cuda.manual_seed(args.seed)
+if args.cuda:
+    torch.cuda.manual_seed(args.seed)
 from torch_geometric.utils import to_undirected
 import torch_geometric.transforms as T
 transform = T.Compose([T.NormalizeFeatures()])
@@ -191,7 +202,8 @@ model = Backdoor(args,device)
 # model.fit(data.x, train_edge_index, None, data.y, idx_train,idx_attach, unlabeled_idx)
 # torch.save(model.trojan.state_dict(), args.trigger_generator_address)
 
-model.fit(data.x, train_edge_index, None, data.y, idx_train, idx_attach, unlabeled_idx, args.trigger_generator_address, True)
+model.fit(data.x, train_edge_index, None, data.y, idx_train, idx_attach, unlabeled_idx)
+torch.save(model.trojan.state_dict(), args.trigger_generator_address)
 
 poison_x, poison_edge_index, poison_edge_weights, poison_labels = model.get_poisoned()
 
@@ -221,7 +233,9 @@ edge_weight = torch.ones([data.edge_index.shape[1]],device=device,dtype=torch.fl
 # poison_edge_weights = data_loaded['poison_edge_weights']
 # poison_labels = data_loaded['poison_labels']
 
-test_model = model_construct(args,args.test_model,data,device).to(device) 
+classifier_seed = args.seed if args.classifier_seed is None else args.classifier_seed
+seed_classifier(classifier_seed, args.cuda)
+test_model = model_construct(args,args.test_model,data,device).to(device)
 if args.test_model == 'ABL':
     test_model.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val,train_iters=args.epochs,verbose=False, num_attach=len(idx_attach))
 else:
@@ -259,159 +273,20 @@ test_model = test_model.cpu()
 
 
 
-#LoSplit Defense###
-LoSplit= model_construct(args,'LoSplit',data,device,split_lr=args.split_lr).to(device) 
-poison_found, clean_found, deltas, target_labels = LoSplit.fit(poison_x,poison_edge_index, poison_edge_weights, poison_labels, known_nodes, idx_val,train_iters=args.epochs,verbose=False, split_epoch=args.split_epoch, num_attach=len(idx_attach))
-
-best_delta = max(deltas[1:])  
-best_t = [i for i, val in enumerate(deltas) if val == best_delta][0] 
-idx_poison_found = poison_found[best_t]
-idx_clean_found = clean_found[best_t]
-target_label = target_labels[best_t]
-
-data_to_save = {
-    'idx_poison_found': idx_poison_found,
-    'idx_clean_found': idx_clean_found,
-    'target_label': target_label,
-    'poison_x': poison_x,
-    'poison_edge_index': poison_edge_index,
-    'poison_edge_weights': poison_edge_weights,
-    'poison_labels': poison_labels
-}
-
-
-torch.save(data_to_save, args.pre_train_param)
-
-
-test_model1 = model_construct(args, args.test_model, data, device).to(device)
-#Decoupling-Forgetting
-test_model1.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val, train_iters=200, verbose=False, finetune2=True, attach=idx_poison_found, clean=idx_clean_found,target_label=target_label, gamma=args.gamma)
-
-# # RIGBD Robust Training
-# test_model1.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val, train_iters=200, verbose=False, finetune1=True)   
-
-# #Discarding Target Nodes/Only use Clean nodes                                                                       
-# test_model1.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val, train_iters=200, verbose=False, finetune3=True, clean=idx_clean_found)   
-
-# # SCRUB Unlearning              
-# test_model1.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val, train_iters=200, verbose=False, finetune4=True, attach=idx_poison_found, clean=idx_clean_found, teacher_model=test_model)
-
-# # Restroing Original Label
-# test_model1.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val, train_iters=200, verbose=False, finetune5=True, attach=idx_poison_found, clean=idx_clean_found, clean_labels=data.y)
-
-# # Feature Reinitialization
-# test_model1.fit(poison_x, train_edge_index, None, poison_labels, bkd_tn_nodes, idx_val, train_iters=200, verbose=False, finetune6=True, attach=idx_poison_found, attach_feature=data.x)
-
-induct_edge_index = torch.cat([poison_edge_index, mask_edge_index], dim=1)
-induct_edge_weights = torch.cat([
-    poison_edge_weights,
-    torch.ones([mask_edge_index.shape[1]], dtype=torch.float, device=device)
-])
-clean_acc = test_model1.test(poison_x, induct_edge_index, induct_edge_weights, data.y, idx_clean_test)
-
-induct_x, induct_edge_index, induct_edge_weights = model.inject_trigger(
-    idx_atk, poison_x, induct_edge_index, induct_edge_weights, device
-)
-induct_x, induct_edge_index, induct_edge_weights = (
-    induct_x.clone().detach(), induct_edge_index.clone().detach(), induct_edge_weights.clone().detach()
-)
-
-output = test_model1(induct_x, induct_edge_index, induct_edge_weights)
-flip_idx_atk = idx_atk[(data.y[idx_atk] != args.target_class).nonzero().flatten()]
-flip_asr = (output.argmax(dim=1)[flip_idx_atk] == args.target_class).detach().cpu().numpy().mean()
-
-print("****After LoSplit Defense****")
-print("ASR: {:.6f}/{} nodes".format(flip_asr,flip_idx_atk.shape[0]))
-print("Clean Accuracy: {:.6f}".format(clean_acc)) 
-
-poison_common = set(idx_poison_found.tolist()) & set(idx_attach.tolist())
-clean_common = set(idx_clean_found.tolist()) & set(idx_train.tolist())
-
-TP = len(poison_common)   
-FP = len(idx_poison_found) - TP 
-FN = len(idx_attach) - TP 
-TN = len(clean_common) 
-
-precision = TP / (TP + FP + 1e-8)
-recall = TP / (TP + FN + 1e-8)
-fpr = FP / (FP + TN + 1e-8)
-
-print(f"Precision: {precision:.4f}")
-print(f"Recall: {recall:.4f}")
-print(f"FPR: {fpr:.4f}")
-
-
-
-# results_stage1 = {
-#     "ASR": round(flip_asr * 100, 2),
-#     "CleanACC": round(clean_acc * 100, 2),
-#     "Precision": round(precision * 100, 2),
-#     "Recall": round(recall * 100, 2),
-#     "FPR": round(fpr * 100, 2),
-#     "split_lr": args.split_lr,
-#     "split_epoch": args.split_epoch,
-# }
-
-# df = pd.DataFrame([results_stage1])
-
-# output_file = f"SPEAR_{args.dataset}_TS_ηS.csv"
-# df.to_csv(output_file, mode='a', index=False, header=not os.path.exists(output_file))
-
-
-# results_stage2 = []
-
-
-# test_model1 = model_construct(args, args.test_model, data, device).to(device)
-
-# test_model1.fit(poison_x, poison_edge_index, poison_edge_weights, poison_labels, bkd_tn_nodes, idx_val, train_iters=200, verbose=False, finetune2=True, attach=idx_poison_found, clean=idx_clean_found,target_label=target_label, gamma=args.gamma)
-
-# induct_edge_index = torch.cat([poison_edge_index, mask_edge_index], dim=1)
-# induct_edge_weights = torch.cat([
-#     poison_edge_weights,
-#     torch.ones([mask_edge_index.shape[1]], dtype=torch.float, device=device)
-# ])
-# clean_acc = test_model1.test(poison_x, induct_edge_index, induct_edge_weights, data.y, idx_clean_test)
-
-# induct_x, induct_edge_index, induct_edge_weights = model.inject_trigger(
-#     idx_atk, poison_x, induct_edge_index, induct_edge_weights, device
-# )
-# induct_x, induct_edge_index, induct_edge_weights = (
-#     induct_x.clone().detach(), induct_edge_index.clone().detach(), induct_edge_weights.clone().detach()
-# )
-
-# output = test_model1(induct_x, induct_edge_index, induct_edge_weights)
-# flip_idx_atk = idx_atk[(data.y[idx_atk] != args.target_class).nonzero().flatten()]
-# flip_asr = (output.argmax(dim=1)[flip_idx_atk] == args.target_class).detach().cpu().numpy().mean()
-# print(f"****γ={args.gamma}:****")
-# print("ASR: {:.6f}/{} nodes".format(flip_asr,flip_idx_atk.shape[0]))
-# print("Clean Accuracy: {:.6f}".format(clean_acc)) 
-
-# poison_common = set(idx_poison_found.tolist()) & set(idx_attach.tolist())
-# clean_common = set(idx_clean_found.tolist()) & set(idx_train.tolist())
-# TP = len(poison_common)
-# FP = len(idx_poison_found) - TP
-# FN = len(idx_attach) - TP
-# TN = len(clean_common)
-
-# precision = TP / (TP + FP + 1e-8)
-# recall = TP / (TP + FN + 1e-8)
-# fpr = FP / (FP + TN + 1e-8)
-
-# print(f"Precision: {precision:.4f}")
-# print(f"Recall: {recall:.4f}")
-# print(f"FPR: {fpr:.4f}")
-
-# results_stage2.append({
-#     "gamma": args.gamma,
-#     "ASR (%)": flip_asr * 100,
-#     "CleanACC (%)": clean_acc * 100,
-#     "Precision": precision,
-#     "Recall": recall,
-#     "FPR": fpr
-# })
-# import pandas as pd
-# import os
-# df2 = pd.DataFrame(results_stage2).round(4)
-
-# output_file = f"SPEAR_{args.dataset}_γ.csv"
-# df2.to_csv(output_file, mode='a', index=False, header=not os.path.exists(output_file))
+# Save the same version-2 fixed inputs consumed by every defense entry.
+from spear_snapshot import generator_metadata
+from experiment_defenses import state_hash
+snapshot = dict(
+    snapshot_version=2, dataset=args.dataset, attack='SPEAR',
+    generation_seed=args.seed, classifier_seed=classifier_seed,
+    classifier_train_lr=args.train_lr, source_defense_mode=args.defense_mode,
+    target_class=args.target_class, trigger_threshold=args.thrd,
+    poison_x=poison_x.detach(), poison_edge_index=poison_edge_index.detach(),
+    poison_edge_weights=poison_edge_weights.detach(), poison_labels=poison_labels.detach(),
+    idx_train=idx_train, idx_attach=idx_attach, idx_val=idx_val,
+    idx_clean_test=idx_clean_test, idx_atk=idx_atk, mask_edge_index=mask_edge_index,
+    original_labels=data.y, num_original_nodes=data.x.size(0),
+    classifier_state_sha256=state_hash(test_model),
+    **generator_metadata(model, args))
+torch.save(snapshot, args.pre_train_param)
+print('SPEAR_SNAPSHOT_SAVED:', args.pre_train_param, flush=True)

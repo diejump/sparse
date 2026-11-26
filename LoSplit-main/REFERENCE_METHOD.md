@@ -2,6 +2,8 @@
 
 日期：2026-11-24。对应实现：models/ABP_Reference.py、reference_training.py、reference_experiment.py。
 
+2026-11-26 补充：SPEAR 的两份固定快照揭示了现有结构候选的覆盖限制。当前参数范围内训练 Recall 为 0%，放宽标量阈值后的结构上限为 5%。完整核对、共同参数比较及证明见 [SPEAR 诊断报告](SPEAR_ABP_DIAGNOSIS.md)。
+
 ## 资料说明
 
 本文依据当前实现、已有开发记录、本地论文正文和本轮程序检查重新组织。实验状态以 runs/reference_ablation_20261124/study.json 和 runs/reference_backbones_20261124/study.json 为准。本文采用 CA、ASR、Precision、Recall、FPR 五项效果指标；模型数量、样本人数和运行时间作为实验配置与计算成本记录。

@@ -80,7 +80,7 @@ parser.add_argument('--vs_number', type=int, default=40,
                     help="number of poisoning nodes relative to the full graph")
 # defense setting
 parser.add_argument('--defense_mode', type=str, default="none",
-                    choices=['none','reconstruct','prune','abp','abp_sparse','abp_dual','abp_assisted'],
+                    choices=['none','reconstruct','prune','abp','losplit','abp_sparse','abp_dual','abp_assisted'],
                     help="Mode of defense")
 parser.add_argument('--prune_thr', type=float, default=0.8,
                     help="Threshold of prunning edges")
@@ -301,7 +301,7 @@ print('GENERATOR_MATCHES_SNAPSHOT: True')
 # poison_x, poison_edge_index, poison_edge_weights, poison_labels = model.get_poisoned()
 
 # ===== 固定快照加载结束，继续作者原防御代码 =====
-if args.defense_mode in ('none', 'abp', 'abp_sparse', 'prune'):
+if args.defense_mode in ('none', 'losplit', 'abp', 'abp_sparse', 'prune'):
     run_comparison(args, data, device, poison_snapshot, model, model_construct, prune_unrelated_edge)
     raise SystemExit(0)
 if args.defense_mode == 'abp':

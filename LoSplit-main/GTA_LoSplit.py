@@ -123,9 +123,8 @@ parser.add_argument('--pre_train_param', type=str, default='./weights/GTA/Cora/G
 #Attack Type
 parser.add_argument('--attack', type=str, default='GTA',
                     help="attack type")
-# configure_algorithm_parser(parser, 'GTA')
+configure_algorithm_parser(parser, 'GTA')
 args = parser.parse_args()
-args = parser.parse_known_args()[0]
 # CPU请求或显式隐藏GPU时，直接选择CPU，避免初始化CUDA运行时。
 cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')
 cuda_disabled = args.no_cuda or (

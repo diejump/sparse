@@ -15,6 +15,35 @@ import run_experiments as runner
 
 class ReportTests(unittest.TestCase):
 
+    def test_complete_entry_parsing_matrix_in_actual_source_order(self):
+        from check_experiment_parameters import check_matrix
+        result = check_matrix()
+        self.assertEqual(result['parsed_jobs'], 472)
+        self.assertEqual(result['model_imports'], 0)
+        self.assertEqual(result['training_runs'], 0)
+
+    def test_gta_ugba_pubmed_losplit_regression(self):
+        from check_experiment_parameters import parse_entry
+        args = Namespace(**dict(runner.SETTINGS, stage='defense', dataset='Pubmed',
+                                attacks=['GTA', 'UGBA'], methods=['losplit']))
+        for name, entry, flags, _, _, _ in runner.build_jobs(args):
+            parsed = parse_entry(entry, flags)
+            algorithm = name.split('/')[0]
+            self.assertEqual((parsed.split_lr, parsed.split_epoch, parsed.gamma),
+                             runner.LOSPLIT_SETTINGS[algorithm]['Pubmed'])
+            self.assertEqual(parsed.vs_number, runner.ATTACK_SETTINGS[algorithm]['Pubmed']['vs_number'])
+
+    def test_entry_checker_catches_early_full_parse(self):
+        from check_experiment_parameters import parse_entry
+        source = (runner.PROJECT / 'GTA_RIGBD.py').read_text(encoding='utf-8')
+        broken = source.replace('add_arguments(parser)', 'args = parser.parse_args()\nadd_arguments(parser)', 1)
+        with tempfile.TemporaryDirectory() as directory:
+            entry = Path(directory) / 'early_parse.py'
+            entry.write_text(broken, encoding='utf-8')
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                parse_entry(entry, ['--dataset=Pubmed', '--defense_mode=losplit',
+                                    '--split_lr=.005', '--split_epoch=15', '--gamma=.55'])
+
     def test_author_budgets_seeds_and_training_parameters(self):
         budgets = {'GTA': [48, 43, 201, 200], 'UGBA': [44, 42, 162, 394],
                    'DPGBA': [50, 45, 194, 200], 'SPEAR': [50, 47, 222, 207]}

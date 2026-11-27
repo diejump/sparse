@@ -65,5 +65,28 @@ GTA、UGBA、DPGBA 的数量对应接收节点数及附加子图份数；`trigge
 ## 验证
 
 - 对压缩包原版逐项核验 16 组算法配置、实际生成命令、LoSplit 参数及 prune 阈值。
-- `python -m unittest test_run_experiments -q`：17 项检查通过，覆盖逐数据集参数、直接入口参数解析、路径、配对任务与显式覆盖。
+- `python -m unittest test_run_experiments -q`：20 项检查通过，覆盖逐数据集参数、真实解析顺序、路径、配对任务与显式覆盖。
 - 使用 `--dry-run` 检查命令；生成入口和模型训练均保持零次执行。
+
+## 参数解析兼容修复
+
+用户提供的 Pubmed 日志显示，GTA 的 LoSplit 任务在参数解析阶段退出：`split_lr`、`split_epoch`、`gamma` 三项被提前执行的完整解析拒绝。
+
+修复后的 GTA、UGBA 评估入口按“注册基础参数 → 注册方法参数 → 应用逐数据集默认值 → 完整解析”执行；两个生成入口也恢复了中央配置函数的实际调用，并移除了重复解析。中央配置函数同时为入口日志设置对应数据集的 LoSplit 默认值，显式命令参数继续优先。
+
+新增 `check_experiment_parameters.py` 按实际源码顺序回放参数解析，覆盖四个数据集、四种算法、三种骨架及受支持的方法，共 472 组命令。该检查执行数据加载、模型导入与训练各零次。另加入提前解析的故障样例，确认检查器能识别本次问题。
+
+服务器同步文件后可先执行：
+
+```bash
+python check_experiment_parameters.py
+python -m unittest test_run_experiments -q
+```
+
+若保留原版压缩包，可附加逐项源代码比对：
+
+```bash
+python check_experiment_parameters.py --source-zip /path/to/LoSplit-main.zip
+```
+
+本地比对结果：16 组算法配置的 336 个参数项、16 组 LoSplit 配置及 16 组 prune 配置全部一致。

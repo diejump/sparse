@@ -254,7 +254,8 @@ def configure_algorithm_parser(parser, algorithm):
     probe, _ = parser.parse_known_args()
     dataset = probe.dataset
     if dataset in ATTACK_SETTINGS[algorithm]:
-        settings = ATTACK_SETTINGS[algorithm][dataset]
+        settings = ATTACK_SETTINGS[algorithm][dataset].copy()
+        settings.update(zip(('split_lr', 'split_epoch', 'gamma'), LOSPLIT_SETTINGS[algorithm][dataset]))
         destinations = {action.dest for action in parser._actions}
         parser.set_defaults(**{key: value for key, value in settings.items() if key in destinations})
 

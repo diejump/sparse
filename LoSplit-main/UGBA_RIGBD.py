@@ -137,11 +137,10 @@ parser.add_argument('--rec_epochs', type=int,  default=ALGORITHM_DEFAULTS['UGBA'
 
 parser.add_argument('--trigger_generator_address', type=str, default='./weights/UGBA/Cora/UGBA_Cora_weights.pth')
 parser.add_argument('--pre_train_param', type=str, default='./weights/UGBA/Cora/UGBA_Cora_RIGBD.pt')
-# configure_algorithm_parser(parser, 'UGBA')
-args = parser.parse_args()
 from experiment_defenses import add_arguments, run_comparison
 add_arguments(parser)
-args = parser.parse_known_args()[0]
+configure_algorithm_parser(parser, 'UGBA')
+args = parser.parse_args()
 if args.defense_mode in ('abp', 'abp_dual', 'abp_assisted'):
     args.skip_rigbd = True
 if args.rigbd_k < 1 or not 0 <= args.rigbd_b <= 1:

@@ -6,12 +6,67 @@ import io
 from pathlib import Path
 import tempfile
 import unittest
+import argparse
+import sys
 from unittest.mock import patch
 
 import run_experiments as runner
 
 
 class ReportTests(unittest.TestCase):
+
+    def test_author_budgets_seeds_and_training_parameters(self):
+        budgets = {'GTA': [48, 43, 201, 200], 'UGBA': [44, 42, 162, 394],
+                   'DPGBA': [50, 45, 194, 200], 'SPEAR': [50, 47, 222, 207]}
+        for algorithm, expected in budgets.items():
+            for dataset, budget in zip(('Cora', 'Citeseer', 'Pubmed', 'Physics'), expected):
+                args = Namespace(stage='all', attacks=[algorithm], methods=['none', 'prune', 'losplit'],
+                                 dataset=dataset, model='GCN', seed=None, epochs=None,
+                                 attack_root='inputs/seed{seed}', defense_root='outputs/seed{seed}')
+                jobs = runner.build_jobs(args)
+                config = runner.ATTACK_SETTINGS[algorithm][dataset]
+                self.assertEqual(config['vs_number'], budget)
+                for name, _, flags, outputs, _, _ in jobs:
+                    values = dict(flag[2:].split('=', 1) for flag in flags if '=' in flag)
+                    for key in ('seed', 'hidden', 'train_lr', 'epochs', 'target_class'):
+                        self.assertEqual(float(values[key]), float(config[key]), (name, dataset, key))
+                    self.assertIn('seed' + str(config['seed']), outputs[0].parts)
+                    self.assertEqual(len(flags), len(set(flag.split('=')[0] for flag in flags)))
+                self.assertEqual(config['seed'], 12 if algorithm == 'DPGBA' else 10)
+        physics = runner.ATTACK_SETTINGS['DPGBA']['Physics']
+        self.assertEqual((physics['hidden'], physics['lr'], physics['weight_ood']), (128, .002, 50))
+        self.assertEqual(runner.ATTACK_SETTINGS['DPGBA']['Cora']['range'], .01)
+
+    def test_direct_parsers_resolve_central_dataset_defaults_without_models(self):
+        for algorithm, datasets in runner.ATTACK_SETTINGS.items():
+            path = runner.PROJECT / ('DPGBA' if algorithm == 'DPGBA' else '') / (algorithm + '_LoSplit.py')
+            tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+            # Execute argument declarations only. All data/model statements stay outside this module.
+            declarations = [node for node in tree.body if (
+                isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'parser'
+                                                     for t in node.targets)) or (
+                isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Attribute)
+                and isinstance(node.value.func.value, ast.Name)
+                and node.value.func.value.id == 'parser' and node.value.func.attr == 'add_argument')]
+            module = compile(ast.Module(body=declarations, type_ignores=[]), '<parser declarations>', 'exec')
+            for dataset, expected in datasets.items():
+                namespace = dict(argparse=argparse, ALGORITHM_DEFAULTS=runner.ALGORITHM_DEFAULTS)
+                exec(module, namespace)
+                with patch.object(sys, 'argv', [path.name, '--dataset=' + dataset]):
+                    runner.configure_algorithm_parser(namespace['parser'], algorithm)
+                    actual = vars(namespace['parser'].parse_args())
+                for key, value in expected.items():
+                    self.assertEqual(actual[key], value, (algorithm, dataset, key))
+
+    def test_explicit_seed_and_epoch_overrides_follow_paired_jobs(self):
+        args = Namespace(stage='all', attacks=['DPGBA'], methods=['none'], dataset='Physics',
+                         model='GCN', seed=41, epochs=17,
+                         attack_root='inputs/seed{seed}', defense_root='outputs/seed{seed}')
+        for _, _, flags, outputs, _, _ in runner.build_jobs(args):
+            self.assertIn('--seed=41', flags)
+            self.assertIn('--epochs=17', flags)
+            self.assertIn('seed41', outputs[0].parts)
 
     def test_range_entry_preserves_backbone_and_three_controls(self):
         for model in ('GCN','GAT','GraphSage'):
@@ -21,6 +76,7 @@ class ReportTests(unittest.TestCase):
                 self.assertEqual(entry.name,'range_reference_launcher.py')
                 for flag in ('--test_model='+model,'--hidden=32','--train_lr=0.01','--range_gamma=2.0','--range_rho=0.2','--range_alpha=0.005','--device=cpu'):
                     self.assertIn(flag,flags)
+                self.assertFalse(any(flag.startswith(('--dropout=', '--weight_decay=')) for flag in flags))
     def test_feature_method_uses_one_frozen_configuration(self):
         args=Namespace(stage='defense',attacks=['GTA','UGBA','DPGBA','SPEAR'],methods=['abp_feature_reference'],
             seed=31,dataset='Cora',model='GCN',attack_root='inputs',defense_root='outputs',feature_repair='none')
@@ -32,6 +88,7 @@ class ReportTests(unittest.TestCase):
             self.assertIn('--train_lr=0.01',flags)
             self.assertIn('--members=1',flags)
             self.assertIn('--feature-repair=none',flags)
+            self.assertFalse(any(flag.startswith(('--dropout=', '--weight_decay=')) for flag in flags))
 
     def test_spear_author_settings_and_paired_inputs(self):
         for dataset, expected in runner.SPEAR_SETTINGS.items():

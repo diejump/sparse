@@ -11,6 +11,7 @@ prepare_environment()
 import imp
 import time
 import argparse
+from run_experiments import ALGORITHM_DEFAULTS, configure_algorithm_parser
 import numpy as np
 import torch
 
@@ -28,7 +29,7 @@ parser.add_argument('--debug', action='store_true',
         default=True, help='debug mode')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
-parser.add_argument('--seed', type=int, default=12, help='Random seed.')
+parser.add_argument('--seed', type=int, default=ALGORITHM_DEFAULTS['DPGBA']['seed'], help='Random seed.')
 parser.add_argument('--classifier_seed', type=int, default=None,
                     help='Independent evaluation classifier seed; defaults to --seed')
 parser.add_argument('--model', type=str, default='GCN', help='model',
@@ -36,33 +37,33 @@ parser.add_argument('--model', type=str, default='GCN', help='model',
 parser.add_argument('--dataset', type=str, default='Pubmed', 
                     help='Dataset',
                     choices=['Cora','Pubmed','Flickr','ogbn-arxiv','Citeseer','Reddit2','Physics'])
-parser.add_argument('--train_lr', type=float, default=0.01,
+parser.add_argument('--train_lr', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['train_lr'],
                     help='Initial learning rate.')
-parser.add_argument('--weight_decay', type=float, default=5e-4,
+parser.add_argument('--weight_decay', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['weight_decay'],
                     help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=512,
+parser.add_argument('--hidden', type=int, default=ALGORITHM_DEFAULTS['DPGBA']['hidden'],
                     help='Number of hidden units.')
-parser.add_argument('--thrd', type=float, default=0.5)
-parser.add_argument('--target_class', type=int, default=6)
-parser.add_argument('--k', type=int, default=100)
-parser.add_argument('--dropout', type=float, default=0.5,
+parser.add_argument('--thrd', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['thrd'])
+parser.add_argument('--target_class', type=int, default=ALGORITHM_DEFAULTS['DPGBA']['target_class'])
+parser.add_argument('--k', type=int, default=ALGORITHM_DEFAULTS['DPGBA']['k'])
+parser.add_argument('--dropout', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['dropout'],
                     help='Dropout rate (1 - keep probability).')
-parser.add_argument('--epochs', type=int,  default=200, help='Number of epochs to train benign and backdoor model.')
-parser.add_argument('--rec_epochs', type=int,  default=100, help='Number of epochs to train benign and backdoor model.')
-parser.add_argument('--trojan_epochs', type=int,  default=400, help='Number of epochs to train trigger generator.')
-parser.add_argument('--inner', type=int,  default=1, help='Number of inner')
+parser.add_argument('--epochs', type=int,  default=ALGORITHM_DEFAULTS['DPGBA']['epochs'], help='Number of epochs to train benign and backdoor model.')
+parser.add_argument('--rec_epochs', type=int,  default=ALGORITHM_DEFAULTS['DPGBA']['rec_epochs'], help='Number of epochs to train benign and backdoor model.')
+parser.add_argument('--trojan_epochs', type=int,  default=ALGORITHM_DEFAULTS['DPGBA']['trojan_epochs'], help='Number of epochs to train trigger generator.')
+parser.add_argument('--inner', type=int,  default=ALGORITHM_DEFAULTS['DPGBA']['inner'], help='Number of inner')
 # backdoor setting
-parser.add_argument('--lr', type=float, default=0.01,
+parser.add_argument('--lr', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['lr'],
                     help='Initial learning rate.')
-parser.add_argument('--trigger_size', type=int, default=3,
+parser.add_argument('--trigger_size', type=int, default=ALGORITHM_DEFAULTS['DPGBA']['trigger_size'],
                     help='tirgger_size')
-parser.add_argument('--use_vs_number', action='store_true', default=True,
+parser.add_argument('--use_vs_number', action='store_true', default=ALGORITHM_DEFAULTS['DPGBA']['use_vs_number'],
                     help="if use detailed number to decide Vs")
-parser.add_argument('--vs_ratio', type=float, default=0,
+parser.add_argument('--vs_ratio', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['vs_ratio'],
                     help="ratio of poisoning nodes relative to the full graph")
-parser.add_argument('--range', type=float, default=1.0,
+parser.add_argument('--range', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['range'],
                     help="ratio of poisoning nodes relative to the full graph")
-parser.add_argument('--vs_number', type=int, default=40,
+parser.add_argument('--vs_number', type=int, default=ALGORITHM_DEFAULTS['DPGBA']['vs_number'],
                     help="number of poisoning nodes relative to the full graph")
 
 #Prune&OD Setting
@@ -71,13 +72,13 @@ parser.add_argument('--defense_mode', type=str, default="none",
                     help="Mode of defense")
 parser.add_argument('--prune_thr', type=float, default=0.8,
                     help="Threshold of prunning edges")
-parser.add_argument('--weight_target', type=float, default=1,
+parser.add_argument('--weight_target', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['weight_target'],
                     help="Weight of attack loss")
-parser.add_argument('--weight_ood', type=float, default=1,
+parser.add_argument('--weight_ood', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['weight_ood'],
                     help="Weight of ood constraint")
-parser.add_argument('--weight_targetclass', type=float, default=1,
+parser.add_argument('--weight_targetclass', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['weight_targetclass'],
                     help="Weight of enhancing attack loss")
-parser.add_argument('--outter_size', type=int, default=4096,
+parser.add_argument('--outter_size', type=int, default=ALGORITHM_DEFAULTS['DPGBA']['outter_size'],
                     help="Weight of optimize outter trigger generator")
 
 #ABL Setting
@@ -99,9 +100,9 @@ parser.add_argument('--gamma', type=float, default=1,
                     help='Decoupling trade off')
 
 #Attack Setting
-parser.add_argument('--dis_weight', type=float, default=1,
+parser.add_argument('--dis_weight', type=float, default=ALGORITHM_DEFAULTS['DPGBA']['dis_weight'],
                     help="Weight of cluster distance")
-parser.add_argument('--selection_method', type=str, default='none',
+parser.add_argument('--selection_method', type=str, default=ALGORITHM_DEFAULTS['DPGBA']['selection_method'],
                     choices=['loss','conf','cluster','none','cluster_degree'],
                     help='Method to select idx_attach for training trojan model (none means randomly select)')
 parser.add_argument('--test_model', type=str, default='GCN',
@@ -116,7 +117,7 @@ parser.add_argument('--pre_train_param', type=str, default='./DPGBA_Cora.pt')
 #Attack Type
 parser.add_argument('--attack', type=str, default='DPGBA',
                     help="attack type")
-# args = parser.parse_args()
+configure_algorithm_parser(parser, 'DPGBA')
 args = parser.parse_known_args()[0]
 # CPU请求或显式隐藏GPU时，直接选择CPU，避免初始化CUDA运行时。
 cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')

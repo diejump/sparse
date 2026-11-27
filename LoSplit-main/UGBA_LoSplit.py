@@ -12,6 +12,7 @@ import imp
 from copy import deepcopy
 import time
 import argparse
+from run_experiments import ALGORITHM_DEFAULTS, configure_algorithm_parser
 import numpy as np
 import torch
 import torch.nn as nn
@@ -33,7 +34,7 @@ parser.add_argument('--debug', action='store_true',
         default=True, help='debug mode')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
-parser.add_argument('--seed', type=int, default=10, help='Random seed.')
+parser.add_argument('--seed', type=int, default=ALGORITHM_DEFAULTS['UGBA']['seed'], help='Random seed.')
 parser.add_argument('--classifier_seed', type=int, default=None,
                     help='Independent evaluation classifier seed; defaults to --seed')
 parser.add_argument('--model', type=str, default='GCN', help='model',
@@ -41,51 +42,51 @@ parser.add_argument('--model', type=str, default='GCN', help='model',
 parser.add_argument('--dataset', type=str, default='Cora', 
                     help='Dataset',
                     choices=['Cora','Pubmed','Flickr','ogbn-arxiv', 'Citeseer', 'Physics'])
-parser.add_argument('--train_lr', type=float, default=0.01,
+parser.add_argument('--train_lr', type=float, default=ALGORITHM_DEFAULTS['UGBA']['train_lr'],
                     help='Initial learning rate.')
-parser.add_argument('--weight_decay', type=float, default=5e-4,
+parser.add_argument('--weight_decay', type=float, default=ALGORITHM_DEFAULTS['UGBA']['weight_decay'],
                     help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=32,
+parser.add_argument('--hidden', type=int, default=ALGORITHM_DEFAULTS['UGBA']['hidden'],
                     help='Number of hidden units.')
-parser.add_argument('--thrd', type=float, default=0.5)
+parser.add_argument('--thrd', type=float, default=ALGORITHM_DEFAULTS['UGBA']['thrd'])
 
-parser.add_argument('--target_class', type=int, default=0)
+parser.add_argument('--target_class', type=int, default=ALGORITHM_DEFAULTS['UGBA']['target_class'])
 
-parser.add_argument('--dropout', type=float, default=0.5,
+parser.add_argument('--dropout', type=float, default=ALGORITHM_DEFAULTS['UGBA']['dropout'],
                     help='Dropout rate (1 - keep probability).')
-parser.add_argument('--epochs', type=int,  default=200, help='Number of epochs to train benign and backdoor model.')
-parser.add_argument('--trojan_epochs', type=int,  default=400, help='Number of epochs to train trigger generator.')
-parser.add_argument('--rec_epochs', type=int,  default=100,
+parser.add_argument('--epochs', type=int,  default=ALGORITHM_DEFAULTS['UGBA']['epochs'], help='Number of epochs to train benign and backdoor model.')
+parser.add_argument('--trojan_epochs', type=int,  default=ALGORITHM_DEFAULTS['UGBA']['trojan_epochs'], help='Number of epochs to train trigger generator.')
+parser.add_argument('--rec_epochs', type=int,  default=ALGORITHM_DEFAULTS['UGBA']['rec_epochs'],
                     help='Number of epochs to train benign and backdoor model.')
-parser.add_argument('--inner', type=int,  default=1, help='Number of inner')
+parser.add_argument('--inner', type=int,  default=ALGORITHM_DEFAULTS['UGBA']['inner'], help='Number of inner')
 
 
 #Backdoor Setting
-parser.add_argument('--lr', type=float, default=0.01,
+parser.add_argument('--lr', type=float, default=ALGORITHM_DEFAULTS['UGBA']['lr'],
                     help='Initial learning rate.')
-parser.add_argument('--trigger_size', type=int, default=3,
+parser.add_argument('--trigger_size', type=int, default=ALGORITHM_DEFAULTS['UGBA']['trigger_size'],
                     help='tirgger_size')
-parser.add_argument('--use_vs_number', action='store_true', default=True,
+parser.add_argument('--use_vs_number', action='store_true', default=ALGORITHM_DEFAULTS['UGBA']['use_vs_number'],
                     help="if use detailed number to decide Vs")
-parser.add_argument('--vs_ratio', type=float, default=0,
+parser.add_argument('--vs_ratio', type=float, default=ALGORITHM_DEFAULTS['UGBA']['vs_ratio'],
                     help="ratio of poisoning nodes relative to the full graph")
-parser.add_argument('--vs_number', type=int, default=40,
+parser.add_argument('--vs_number', type=int, default=ALGORITHM_DEFAULTS['UGBA']['vs_number'],
                     help="number of poisoning nodes relative to the full graph")
 
 
 #UGBA Setting
-parser.add_argument('--target_loss_weight', type=float, default=1,
+parser.add_argument('--target_loss_weight', type=float, default=ALGORITHM_DEFAULTS['UGBA']['target_loss_weight'],
                     help="Weight of optimize outter trigger generator")
-parser.add_argument('--homo_loss_weight', type=float, default=50,
+parser.add_argument('--homo_loss_weight', type=float, default=ALGORITHM_DEFAULTS['UGBA']['homo_loss_weight'],
                     help="Weight of optimize similarity loss")
-parser.add_argument('--homo_boost_thrd', type=float, default=0.5, 
+parser.add_argument('--homo_boost_thrd', type=float, default=ALGORITHM_DEFAULTS['UGBA']['homo_boost_thrd'],
                     help="Threshold of increase similarity")
 
 
 #Attack Setting
-parser.add_argument('--dis_weight', type=float, default=1,
+parser.add_argument('--dis_weight', type=float, default=ALGORITHM_DEFAULTS['UGBA']['dis_weight'],
                     help="Weight of cluster distance")
-parser.add_argument('--selection_method', type=str, default='cluster_degree',
+parser.add_argument('--selection_method', type=str, default=ALGORITHM_DEFAULTS['UGBA']['selection_method'],
                     choices=['loss','conf','cluster','none','cluster_degree'],
                     help='Method to select idx_attach for training trojan model (none means randomly select)')
 parser.add_argument('--test_model', type=str, default='GCN',
@@ -131,7 +132,8 @@ parser.add_argument('--pre_train_param', type=str, default='./weights/UGBA/Cora/
 #Attack Type
 parser.add_argument('--attack', type=str, default='UGBA',
                     help="attack type")
-# args = parser.parse_args()
+# configure_algorithm_parser(parser, 'UGBA')
+args = parser.parse_args()
 args = parser.parse_known_args()[0]
 # CPU请求或显式隐藏GPU时，直接选择CPU，避免初始化CUDA运行时。
 cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')

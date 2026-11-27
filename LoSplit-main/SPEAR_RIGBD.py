@@ -2,6 +2,7 @@
 from deterministic_runtime import prepare_environment, configure_determinism, seed_classifier
 prepare_environment()
 import argparse
+from run_experiments import ALGORITHM_DEFAULTS, PRUNE_SETTINGS, configure_algorithm_parser
 import hashlib
 from pathlib import Path
 
@@ -20,28 +21,29 @@ def main():
     parser.add_argument('--deterministic', action='store_true')
     parser.add_argument('--no-cuda', action='store_true')
     parser.add_argument('--device_id', type=int, default=0)
-    parser.add_argument('--seed', type=int, default=10)
+    parser.add_argument('--seed', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['seed'])
     parser.add_argument('--classifier_seed', type=int)
     parser.add_argument('--dataset', default='Cora',
         choices=['Cora', 'Citeseer', 'Pubmed', 'Physics', 'Flickr', 'ogbn-arxiv'])
     parser.add_argument('--model', default='GCN')
     parser.add_argument('--test_model', choices=['GCN', 'GAT', 'GraphSage'], default='GCN')
-    parser.add_argument('--hidden', type=int, default=80)
-    parser.add_argument('--train_lr', type=float, default=.01)
-    parser.add_argument('--dropout', type=float, default=.5)
-    parser.add_argument('--weight_decay', type=float, default=5e-4)
-    parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--target_class', type=int, default=0)
+    parser.add_argument('--hidden', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['hidden'])
+    parser.add_argument('--train_lr', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['train_lr'])
+    parser.add_argument('--dropout', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['dropout'])
+    parser.add_argument('--weight_decay', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['weight_decay'])
+    parser.add_argument('--epochs', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['epochs'])
+    parser.add_argument('--target_class', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['target_class'])
     parser.add_argument('--defense_mode', default='none',
         choices=['none', 'losplit', 'prune', 'abp', 'abp_sparse'])
     parser.add_argument('--skip_rigbd', action='store_true')
     parser.add_argument('--rigbd_k', type=int, default=20)
     parser.add_argument('--rigbd_b', type=float, default=.5)
-    parser.add_argument('--prune_thr', type=float, default=.1)
+    parser.add_argument('--prune_thr', type=float, default=PRUNE_SETTINGS['SPEAR'])
     parser.add_argument('--trigger_generator_address', required=True)
     parser.add_argument('--pre_train_param', required=True)
     parser.add_argument('--model_save_path', default='')
     add_arguments(parser)
+    configure_algorithm_parser(parser, 'SPEAR')
     args = parser.parse_args()
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device(f'cuda:{args.device_id}' if args.cuda else 'cpu')

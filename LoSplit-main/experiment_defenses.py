@@ -10,12 +10,9 @@ from deterministic_runtime import seed_classifier
 from rigbd_utils import sample_edges, select_candidates, split_training_nodes, recovery_loss
 
 
-ORIGINAL_GRIDS = {
-    'GTA': ([10, 20, 25, 50], [0.3, 0.5, 0.7, 0.9]),
-    'UGBA': ([25, 50, 100], [0.3, 0.5, 0.7, 0.9]),
-    'DPGBA': ([2, 5, 25, 50, 100], [0.1, 0.3, 0.5, 0.7, 0.9]),
-    'SPEAR': ([50, 100], [0.5, 0.7, 0.9]),
-}
+from run_experiments import SETTINGS, RIGBD_GRIDS
+
+ORIGINAL_GRIDS = RIGBD_GRIDS
 
 
 def add_arguments(parser):
@@ -24,15 +21,15 @@ def add_arguments(parser):
             parser.add_argument('--' + name, type=kind, default=None)
         else:
             parser.set_defaults(**{name: None})
-    parser.add_argument('--abp_sparse_multiplier', type=float, default=0.95)
-    parser.add_argument('--abp_sparse_strength', type=float, default=0.25)
+    parser.add_argument('--abp_sparse_multiplier', type=float, default=SETTINGS['abp_sparse_multiplier'])
+    parser.add_argument('--abp_sparse_strength', type=float, default=SETTINGS['abp_sparse_strength'])
     parser.add_argument('--rigbd_grid', action='store_true')
     parser.add_argument('--rigbd_probe_self_loops', action='store_true',
                         help='Explicit self-loop probe variant; not original neighbor-only RIGBD')
-    parser.add_argument('--rigbd_sampling', choices=('receiver', 'legacy_source'), default='receiver')
+    parser.add_argument('--rigbd_sampling', choices=('receiver', 'legacy_source'), default=SETTINGS['rigbd_sampling'])
     parser.add_argument('--rigbd_selection', choices=('label_boundary', 'losplit', 'fixed_count'),
-                        default='label_boundary', help='Infer target and threshold from training labels by default')
-    parser.add_argument('--rigbd_grid_selection', choices=('validation', 'min_asr'), default='validation',
+                        default=SETTINGS['rigbd_selection'], help='Infer target and threshold from training labels by default')
+    parser.add_argument('--rigbd_grid_selection', choices=('validation', 'min_asr'), default=SETTINGS['rigbd_grid_selection'],
                         help='min_asr uses test outcomes and is for retrospective diagnostics only')
 
 

@@ -3,6 +3,7 @@ from pathlib import Path
 from deterministic_runtime import prepare_environment, configure_determinism, seed_classifier
 prepare_environment()
 import argparse
+from run_experiments import ALGORITHM_DEFAULTS, configure_algorithm_parser
 import numpy as np
 import torch
 from copy import deepcopy
@@ -29,49 +30,49 @@ parser.add_argument('--debug', action='store_true',
         default=True, help='debug mode')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
-parser.add_argument('--seed', type=int, default=10, help='Random seed.')
+parser.add_argument('--seed', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['seed'], help='Random seed.')
 parser.add_argument('--model', type=str, default='GCN', help='model',
                     choices=['GCN','GAT','GraphSage','GIN'])
 parser.add_argument('--dataset', type=str, default='Cora', 
                     help='Dataset',
                     choices=['Cora','Pubmed','Flickr','ogbn-arxiv','Computers','Photo', 'Citeseer', 'Physics'])
-parser.add_argument('--train_lr', type=float, default=0.01,
+parser.add_argument('--train_lr', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['train_lr'],
                     help='Initial learning rate.')
-parser.add_argument('--weight_decay', type=float, default=5e-4,
+parser.add_argument('--weight_decay', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['weight_decay'],
                     help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=64,
+parser.add_argument('--hidden', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['hidden'],
                     help='Number of hidden units.')
-parser.add_argument('--thrd', type=float, default=0.5)
+parser.add_argument('--thrd', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['thrd'])
 
-parser.add_argument('--target_class', type=int, default=0)
+parser.add_argument('--target_class', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['target_class'])
 
-parser.add_argument('--dropout', type=float, default=0.5,
+parser.add_argument('--dropout', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['dropout'],
                     help='Dropout rate (1 - keep probability).')
-parser.add_argument('--epochs', type=int,  default=200, help='Number of epochs to train benign and backdoor model.')
-parser.add_argument('--trojan_epochs', type=int,  default=400, help='Number of epochs to train trigger generator.')
-parser.add_argument('--rec_epochs', type=int,  default=100,
+parser.add_argument('--epochs', type=int,  default=ALGORITHM_DEFAULTS['SPEAR']['epochs'], help='Number of epochs to train benign and backdoor model.')
+parser.add_argument('--trojan_epochs', type=int,  default=ALGORITHM_DEFAULTS['SPEAR']['trojan_epochs'], help='Number of epochs to train trigger generator.')
+parser.add_argument('--rec_epochs', type=int,  default=ALGORITHM_DEFAULTS['SPEAR']['rec_epochs'],
                     help='Number of epochs to train benign and backdoor model.')
-parser.add_argument('--inner', type=int,  default=1, help='Number of inner')
+parser.add_argument('--inner', type=int,  default=ALGORITHM_DEFAULTS['SPEAR']['inner'], help='Number of inner')
 
 #Backdoor Setting
-parser.add_argument('--shadow_lr', type=float, default=0.01,
+parser.add_argument('--shadow_lr', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['shadow_lr'],
                     help='Initial learning rate.')
-parser.add_argument('--trojan_lr', type=float, default=0.01,
+parser.add_argument('--trojan_lr', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['trojan_lr'],
                     help='Initial learning rate.')
-parser.add_argument('--use_vs_number', action='store_true', default=True,
+parser.add_argument('--use_vs_number', action='store_true', default=ALGORITHM_DEFAULTS['SPEAR']['use_vs_number'],
                     help="if use detailed number to decide Vs")
-parser.add_argument('--vs_ratio', type=float, default=0,
+parser.add_argument('--vs_ratio', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['vs_ratio'],
                     help="ratio of poisoning nodes relative to the full graph")
-parser.add_argument('--vs_number', type=int, default=50,
+parser.add_argument('--vs_number', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['vs_number'],
                     help="number of poisoning nodes relative to the full graph")
-parser.add_argument('--target_loss_weight', type=float, default=2,
+parser.add_argument('--target_loss_weight', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['target_loss_weight'],
                     help="Weight of optimize outter trigger generator")
-parser.add_argument('--homo_loss_weight', type=float, default=1.2,
+parser.add_argument('--homo_loss_weight', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['homo_loss_weight'],
                     help="Weight of optimize similarity loss")
 
 
 #Attack Setting
-parser.add_argument('--dis_weight', type=float, default=1,
+parser.add_argument('--dis_weight', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['dis_weight'],
                     help="Weight of cluster distance")
 parser.add_argument('--test_model', type=str, default='GCN',
                     choices=['GCN','GAT','GraphSage','GNNGuard','RobustGCN', 'ABL'],
@@ -108,11 +109,11 @@ parser.add_argument('--device_id', type=int, default=0,
                     help="Threshold of prunning edges")
 
 #SPEAR Setting
-parser.add_argument('--alpha', type=float, default=0.1,
+parser.add_argument('--alpha', type=float, default=ALGORITHM_DEFAULTS['SPEAR']['alpha'],
                     help="Ratio of feature dimensions to perturb")
-parser.add_argument('--alpha_int', type=int, default=4,
+parser.add_argument('--alpha_int', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['alpha_int'],
                     help="Number of feature dimensions to perturb")
-parser.add_argument('--outter_size', type=int, default=512,
+parser.add_argument('--outter_size', type=int, default=ALGORITHM_DEFAULTS['SPEAR']['outter_size'],
                     help="Number of outter samples")
 
 #Pre-train Setting
@@ -124,6 +125,7 @@ parser.add_argument('--attack', type=str, default='SPEAR',
                     help="attack type")
 
 
+configure_algorithm_parser(parser, 'SPEAR')
 args = parser.parse_args()
 args.cuda =  not args.no_cuda and torch.cuda.is_available()
 device = torch.device('cuda:{}'.format(args.device_id) if args.cuda else 'cpu')

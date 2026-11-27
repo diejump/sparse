@@ -10,6 +10,7 @@ prepare_environment()
 import imp
 import time
 import argparse
+from run_experiments import ALGORITHM_DEFAULTS, configure_algorithm_parser
 from copy import deepcopy
 from unittest import result
 import numpy as np
@@ -33,7 +34,7 @@ parser.add_argument('--debug', action='store_true',
         default=False, help='debug mode')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disables CUDA training.')
-parser.add_argument('--seed', type=int, default=10, help='Random seed.')
+parser.add_argument('--seed', type=int, default=ALGORITHM_DEFAULTS['GTA']['seed'], help='Random seed.')
 parser.add_argument('--classifier_seed', type=int, default=None,
                     help='Independent evaluation classifier seed; defaults to --seed')
 parser.add_argument('--model', type=str, default='GCN', help='model',
@@ -41,39 +42,39 @@ parser.add_argument('--model', type=str, default='GCN', help='model',
 parser.add_argument('--dataset', type=str, default='Cora', 
                     help='Dataset',
                     choices=['Cora','Citeseer','Pubmed','PPI','Flickr','ogbn-arxiv','Reddit','Reddit2','Yelp', 'Physics'])
-parser.add_argument('--train_lr', type=float, default=0.01,
+parser.add_argument('--train_lr', type=float, default=ALGORITHM_DEFAULTS['GTA']['train_lr'],
                     help='Initial learning rate.')
-parser.add_argument('--weight_decay', type=float, default=5e-4,
+parser.add_argument('--weight_decay', type=float, default=ALGORITHM_DEFAULTS['GTA']['weight_decay'],
                     help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=32,
+parser.add_argument('--hidden', type=int, default=ALGORITHM_DEFAULTS['GTA']['hidden'],
                     help='Number of hidden units.')
-parser.add_argument('--thrd', type=float, default=0.5)
+parser.add_argument('--thrd', type=float, default=ALGORITHM_DEFAULTS['GTA']['thrd'])
 
-parser.add_argument('--target_class', type=int, default=0)
+parser.add_argument('--target_class', type=int, default=ALGORITHM_DEFAULTS['GTA']['target_class'])
 
-parser.add_argument('--dropout', type=float, default=0.5,
+parser.add_argument('--dropout', type=float, default=ALGORITHM_DEFAULTS['GTA']['dropout'],
                     help='Dropout rate (1 - keep probability).')
-parser.add_argument('--epochs', type=int,  default=200, help='Number of epochs to train benign and backdoor model.')
-parser.add_argument('--trojan_epochs', type=int,  default=400, help='Number of epochs to train trigger generator.')
-parser.add_argument('--inner', type=int,  default=1, help='Number of inner')
+parser.add_argument('--epochs', type=int,  default=ALGORITHM_DEFAULTS['GTA']['epochs'], help='Number of epochs to train benign and backdoor model.')
+parser.add_argument('--trojan_epochs', type=int,  default=ALGORITHM_DEFAULTS['GTA']['trojan_epochs'], help='Number of epochs to train trigger generator.')
+parser.add_argument('--inner', type=int,  default=ALGORITHM_DEFAULTS['GTA']['inner'], help='Number of inner')
 
 #Backdoor Setting
-parser.add_argument('--lr', type=float, default=0.01,
+parser.add_argument('--lr', type=float, default=ALGORITHM_DEFAULTS['GTA']['lr'],
                     help='Initial learning rate.')
-parser.add_argument('--trigger_size', type=int, default=3,
+parser.add_argument('--trigger_size', type=int, default=ALGORITHM_DEFAULTS['GTA']['trigger_size'],
                     help='tirgger_size')
-parser.add_argument('--vs_number', type=int, default=40,
+parser.add_argument('--vs_number', type=int, default=ALGORITHM_DEFAULTS['GTA']['vs_number'],
                     help="ratio of poisoning nodes relative to the full graph")
 
 
 
 #Attack Setting
-parser.add_argument('--dis_weight', type=float, default=1,
+parser.add_argument('--dis_weight', type=float, default=ALGORITHM_DEFAULTS['GTA']['dis_weight'],
                     help="Weight of cluster distance")
-parser.add_argument('--selection_method', type=str, default='none',
+parser.add_argument('--selection_method', type=str, default=ALGORITHM_DEFAULTS['GTA']['selection_method'],
                     choices=['loss','conf','cluster','none','cluster_degree'],
                     help='Method to select idx_attach for training trojan model (none means randomly select)')
-parser.add_argument('--homo_loss_weight', type=float, default=0,
+parser.add_argument('--homo_loss_weight', type=float, default=ALGORITHM_DEFAULTS['GTA']['homo_loss_weight'],
                     help="Weight of optimize similarity loss")
 parser.add_argument('--test_model', type=str, default='GCN',
                     choices=['GCN','GAT','GraphSage','GIN'],
@@ -112,7 +113,7 @@ parser.add_argument('--gamma', type=float, default=0.7,
 # GPU setting
 parser.add_argument('--device_id', type=int, default=0,
                     help="Threshold of prunning edges")
-parser.add_argument('--rec_epochs', type=int,  default=100,
+parser.add_argument('--rec_epochs', type=int,  default=ALGORITHM_DEFAULTS['GTA']['rec_epochs'],
                     help='Number of epochs to train benign and backdoor model.')
 
 #Pre-train Setting
@@ -122,7 +123,8 @@ parser.add_argument('--pre_train_param', type=str, default='./weights/GTA/Cora/G
 #Attack Type
 parser.add_argument('--attack', type=str, default='GTA',
                     help="attack type")
-# args = parser.parse_args()
+# configure_algorithm_parser(parser, 'GTA')
+args = parser.parse_args()
 args = parser.parse_known_args()[0]
 # CPU请求或显式隐藏GPU时，直接选择CPU，避免初始化CUDA运行时。
 cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')

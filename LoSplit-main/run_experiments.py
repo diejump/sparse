@@ -20,6 +20,16 @@ SETTINGS = {
     "dataset": "Citeseer",              # Cora / Citeseer / Pubmed / Physics
     "model": "GCN",                 # GCN / GAT / GraphSage
     "deterministic": True,
+    "rigbd_fixed": False,
+    "rigbd_k": 20,
+    "rigbd_b": 0.5,
+    "rigbd_selection": "label_boundary",
+    "rigbd_sampling": "receiver",
+    "rigbd_grid_selection": "validation",
+    "range_gamma": 2.0,
+    "range_rho": 0.2,
+    "range_alpha": 0.005,
+    "reference_device": None,
     "abp_sparse_multiplier": 0.95,
     "abp_sparse_strength": 0.25,
     "abp_reference_multiplier": 2.0,
@@ -32,36 +42,228 @@ SETTINGS = {
     "feature_members": 1,
     "feature_repair": "unique_mode",
     "feature_tolerance": 1e-6,
-    "seed": 10,
+    "seed": None,                  # None: original per-algorithm seeds (DPGBA=12; others=10)
+    "epochs": None,                # None: original per-algorithm training epochs
     "gpu": "0",                     # physical GPU; child uses visible device 0
     "attack_root": f"runs/comparison_inputs_{name}/{{dataset}}/{{model}}/seed{{seed}}",
     "defense_root": f"runs/comparison_outputs_{name}/{{dataset}}/{{model}}/seed{{seed}}",
     "report": None,                 # None: <defense_root>/results.md (attack-only: attack_root)
 }
 PROJECT = Path(__file__).resolve().parent
-ATTACK_ARGS = {
-    "GTA": ["--train_lr=0.01", "--lr=0.01", "--trojan_epochs=400",
-            "--vs_number=48", "--split_lr=0.01", "--split_epoch=10", "--gamma=0.3"],
-    "UGBA": ["--train_lr=0.01", "--lr=0.01", "--trojan_epochs=400",
-             "--vs_number=44", "--homo_loss_weight=50", "--homo_boost_thrd=0.5",
-             "--split_lr=0.01", "--split_epoch=15", "--gamma=0.2"],
-    "DPGBA": ["--train_lr=0.015", "--lr=0.015", "--trojan_epochs=300",
-              "--vs_number=50", "--k=50", "--outter_size=4096",
-              "--selection_method=none", "--weight_target=1", "--weight_ood=1",
-              "--weight_targetclass=2", "--split_lr=0.01", "--split_epoch=15", "--gamma=1.0"],
-    "SPEAR": [],  # Dataset-specific author settings below.
+# Reproduction parameters: original LoSplit-main.zip Python defaults, then defense.sh overrides.
+# All algorithm hyperparameters used by this launcher are explicit here.
+# --seed and --epochs are optional global overrides; None preserves each author setting.
+ALGORITHM_DEFAULTS = {'GTA': {'seed': 10,
+         'train_lr': 0.01,
+         'weight_decay': 0.0005,
+         'hidden': 32,
+         'thrd': 0.5,
+         'target_class': 0,
+         'dropout': 0.5,
+         'epochs': 200,
+         'trojan_epochs': 400,
+         'inner': 1,
+         'lr': 0.01,
+         'trigger_size': 3,
+         'vs_number': 40,
+         'dis_weight': 1,
+         'selection_method': 'none',
+         'homo_loss_weight': 0,
+         'rec_epochs': 100},
+ 'UGBA': {'seed': 10,
+          'train_lr': 0.01,
+          'weight_decay': 0.0005,
+          'hidden': 32,
+          'thrd': 0.5,
+          'target_class': 0,
+          'dropout': 0.5,
+          'epochs': 200,
+          'trojan_epochs': 400,
+          'rec_epochs': 100,
+          'inner': 1,
+          'lr': 0.01,
+          'trigger_size': 3,
+          'use_vs_number': True,
+          'vs_ratio': 0,
+          'vs_number': 40,
+          'target_loss_weight': 1,
+          'homo_loss_weight': 50,
+          'homo_boost_thrd': 0.5,
+          'dis_weight': 1,
+          'selection_method': 'cluster_degree'},
+ 'DPGBA': {'seed': 12,
+           'train_lr': 0.01,
+           'weight_decay': 0.0005,
+           'hidden': 512,
+           'thrd': 0.5,
+           'target_class': 6,
+           'k': 100,
+           'dropout': 0.5,
+           'epochs': 200,
+           'rec_epochs': 100,
+           'trojan_epochs': 400,
+           'inner': 1,
+           'lr': 0.01,
+           'trigger_size': 3,
+           'use_vs_number': True,
+           'vs_ratio': 0,
+           'range': 0.01,
+           'vs_number': 40,
+           'weight_target': 1,
+           'weight_ood': 1,
+           'weight_targetclass': 1,
+           'outter_size': 4096,
+           'dis_weight': 1,
+           'selection_method': 'none'},
+ 'SPEAR': {'seed': 10,
+           'train_lr': 0.01,
+           'weight_decay': 0.0005,
+           'hidden': 64,
+           'thrd': 0.5,
+           'target_class': 0,
+           'dropout': 0.5,
+           'epochs': 200,
+           'trojan_epochs': 400,
+           'rec_epochs': 100,
+           'inner': 1,
+           'shadow_lr': 0.01,
+           'trojan_lr': 0.01,
+           'use_vs_number': True,
+           'vs_ratio': 0,
+           'vs_number': 50,
+           'target_loss_weight': 2,
+           'homo_loss_weight': 1.2,
+           'dis_weight': 1,
+           'alpha': 0.1,
+           'alpha_int': 4,
+           'outter_size': 512}}
+DATASET_OVERRIDES = {'GTA': {'Cora': {'vs_number': 48},
+         'Citeseer': {'vs_number': 43},
+         'Pubmed': {'vs_number': 201},
+         'Physics': {'vs_number': 200}},
+ 'UGBA': {'Cora': {'vs_number': 44, 'homo_loss_weight': 50, 'homo_boost_thrd': 0.5},
+          'Citeseer': {'vs_number': 42, 'homo_loss_weight': 150, 'homo_boost_thrd': 0.3},
+          'Pubmed': {'vs_number': 162, 'homo_loss_weight': 100, 'homo_boost_thrd': 0.5},
+          'Physics': {'vs_number': 394, 'hidden': 64, 'homo_loss_weight': 200, 'homo_boost_thrd': 0.8}},
+ 'DPGBA': {'Cora': {'vs_number': 50,
+                    'k': 50,
+                    'hidden': 32,
+                    'weight_target': 1,
+                    'weight_ood': 1,
+                    'weight_targetclass': 2,
+                    'train_lr': 0.015,
+                    'lr': 0.015,
+                    'target_class': 0,
+                    'trojan_epochs': 300},
+           'Citeseer': {'vs_number': 45,
+                        'k': 50,
+                        'hidden': 32,
+                        'weight_target': 1,
+                        'weight_ood': 1,
+                        'weight_targetclass': 2,
+                        'train_lr': 0.015,
+                        'lr': 0.015,
+                        'target_class': 0,
+                        'trojan_epochs': 300},
+           'Pubmed': {'vs_number': 194,
+                      'k': 50,
+                      'hidden': 16,
+                      'weight_target': 1,
+                      'weight_ood': 2,
+                      'weight_targetclass': 5,
+                      'train_lr': 0.015,
+                      'lr': 0.015,
+                      'target_class': 0,
+                      'trojan_epochs': 400,
+                      'epochs': 200},
+           'Physics': {'vs_number': 200,
+                       'k': 50,
+                       'hidden': 128,
+                       'weight_target': 1,
+                       'weight_ood': 50,
+                       'weight_targetclass': 10,
+                       'train_lr': 0.002,
+                       'lr': 0.002,
+                       'target_class': 0,
+                       'trojan_epochs': 400,
+                       'epochs': 200}},
+ 'SPEAR': {'Cora': {'homo_loss_weight': 0.1,
+                    'target_loss_weight': 1,
+                    'vs_number': 50,
+                    'epochs': 200,
+                    'trojan_epochs': 200,
+                    'alpha_int': 30,
+                    'hidden': 80,
+                    'shadow_lr': 0.0002,
+                    'trojan_lr': 0.0002},
+           'Citeseer': {'homo_loss_weight': 0.05,
+                        'target_loss_weight': 1,
+                        'vs_number': 47,
+                        'epochs': 200,
+                        'trojan_epochs': 200,
+                        'alpha_int': 10,
+                        'hidden': 64,
+                        'shadow_lr': 0.0002,
+                        'trojan_lr': 0.0002},
+           'Pubmed': {'homo_loss_weight': 0.15,
+                      'vs_number': 222,
+                      'epochs': 200,
+                      'trojan_epochs': 200,
+                      'alpha_int': 10,
+                      'hidden': 64,
+                      'target_class': 2,
+                      'shadow_lr': 0.005,
+                      'trojan_lr': 0.005},
+           'Physics': {'vs_number': 207,
+                       'homo_loss_weight': 0.15,
+                       'epochs': 200,
+                       'trojan_epochs': 200,
+                       'alpha_int': 15,
+                       'hidden': 64,
+                       'target_class': 0,
+                       'shadow_lr': 0.0005,
+                       'trojan_lr': 0.0005}}}
+ATTACK_SETTINGS = {algorithm: {dataset: dict(values, **DATASET_OVERRIDES[algorithm][dataset])
+    for dataset in DATASET_OVERRIDES[algorithm]} for algorithm, values in ALGORITHM_DEFAULTS.items()}
+# Compatibility names for callers that enumerate algorithms / inspect the SPEAR table.
+ATTACK_ARGS = {algorithm: [] for algorithm in ATTACK_SETTINGS}
+SPEAR_SETTINGS = {dataset: {key: values[key] for key in ('hidden', 'vs_number',
+    'homo_loss_weight', 'target_loss_weight', 'alpha_int', 'shadow_lr', 'trojan_lr', 'target_class')}
+    for dataset, values in ATTACK_SETTINGS['SPEAR'].items()}
+PRUNE_SETTINGS = {'GTA': 0.8, 'UGBA': 0.2, 'DPGBA': 0.8, 'SPEAR': 0.1}
+REFERENCE_MODEL_SETTINGS = {'hidden': 32, 'train_lr': 0.01}
+RIGBD_GRIDS = {
+    'GTA': ([10, 20, 25, 50], [0.3, 0.5, 0.7, 0.9]),
+    'UGBA': ([25, 50, 100], [0.3, 0.5, 0.7, 0.9]),
+    'DPGBA': ([2, 5, 25, 50, 100], [0.1, 0.3, 0.5, 0.7, 0.9]),
+    'SPEAR': ([50, 100], [0.5, 0.7, 0.9]),
 }
-# Values transcribed from the original defense.sh, including SPEAR's width.
-SPEAR_SETTINGS = {
-    "Cora": dict(hidden=80, vs_number=50, homo_loss_weight=.1, target_loss_weight=1,
-                 alpha_int=30, shadow_lr=.0002, trojan_lr=.0002, target_class=0),
-    "Citeseer": dict(hidden=64, vs_number=47, homo_loss_weight=.05, target_loss_weight=1,
-                     alpha_int=10, shadow_lr=.0002, trojan_lr=.0002, target_class=0),
-    "Pubmed": dict(hidden=64, vs_number=222, homo_loss_weight=.15, target_loss_weight=2,
-                   alpha_int=10, shadow_lr=.005, trojan_lr=.005, target_class=2),
-    "Physics": dict(hidden=64, vs_number=207, homo_loss_weight=.15, target_loss_weight=2,
-                    alpha_int=15, shadow_lr=.0005, trojan_lr=.0005, target_class=0),
-}
+
+
+def algorithm_settings(algorithm, dataset, args):
+    values = ATTACK_SETTINGS[algorithm][dataset].copy()
+    for key in ('seed', 'epochs'):
+        override = getattr(args, key, None)
+        if override is not None:
+            values[key] = override
+    return values
+
+
+def configure_algorithm_parser(parser, algorithm):
+    """Resolve dataset defaults for direct entry execution as well as the launcher."""
+    probe, _ = parser.parse_known_args()
+    dataset = probe.dataset
+    if dataset in ATTACK_SETTINGS[algorithm]:
+        settings = ATTACK_SETTINGS[algorithm][dataset]
+        destinations = {action.dest for action in parser._actions}
+        parser.set_defaults(**{key: value for key, value in settings.items() if key in destinations})
+
+
+def parameter_flags(values):
+    return [f'--{key}={value}' if not isinstance(value, bool) else f'--{key}'
+            for key, value in values.items() if not isinstance(value, bool) or value]
+
+
 LOSPLIT_SETTINGS = {
     "GTA": {"Cora": (.01, 10, .3), "Citeseer": (.05, 10, .45),
             "Pubmed": (.005, 15, .55), "Physics": (.00001, 20, .55)},
@@ -93,24 +295,18 @@ def project_path(value):
 
 def build_jobs(args):
     dataset, model = getattr(args, 'dataset', 'Cora'), getattr(args, 'model', 'GCN')
-    substitutions = dict(dataset=dataset, model=model, seed=args.seed)
-    attack_root = project_path(args.attack_root.format(**substitutions))
-    defense_root = project_path(args.defense_root.format(**substitutions))
-    common = (["--deterministic"] if getattr(args, 'deterministic', True) else []) + [f"--dataset={dataset}", "--model=GCN", f"--test_model={model}",
-              "--device_id=0", f"--seed={args.seed}", "--hidden=32",
-              f"--epochs={getattr(args, 'epochs', 200)}", "--target_class=0"]
     jobs = []
     for attack in args.attacks:
-        attack_common = common.copy()
-        attack_flags = ATTACK_ARGS[attack].copy()
-        if attack == "SPEAR":
-            settings = SPEAR_SETTINGS[dataset]
-            attack_common = [flag for flag in common
-                             if not flag.startswith(('--hidden=', '--target_class='))]
-            attack_common += [f"--hidden={settings['hidden']}", f"--target_class={settings['target_class']}"]
-            attack_flags = [f"--{key}={value}" for key, value in settings.items()
-                            if key not in ('hidden', 'target_class')]
-            attack_flags += ["--train_lr=0.01", "--trojan_epochs=200", "--outter_size=512"]
+        settings = algorithm_settings(attack, dataset, args)
+        substitutions = dict(dataset=dataset, model=model, seed=settings['seed'])
+        attack_root = project_path(args.attack_root.format(**substitutions))
+        defense_root = project_path(args.defense_root.format(**substitutions))
+        common_values = {key: settings[key] for key in
+                         ('seed', 'hidden', 'epochs', 'target_class', 'train_lr', 'dropout', 'weight_decay')}
+        attack_common = (["--deterministic"] if getattr(args, 'deterministic', True) else []) + [
+            f"--dataset={dataset}", "--model=GCN", f"--test_model={model}", "--device_id=0"]
+        attack_common += parameter_flags(common_values)
+        attack_flags = parameter_flags({key: value for key, value in settings.items() if key not in common_values})
         prefix = "DPGBA/" if attack == "DPGBA" else ""
         generator = attack_root / attack / "generator.pth"
         snapshot = attack_root / attack / "poison.pt"
@@ -127,16 +323,16 @@ def build_jobs(args):
                     lr, epochs, gamma = LOSPLIT_SETTINGS[attack][dataset]
                     extra += [f'--split_lr={lr}', f'--split_epoch={epochs}', f'--gamma={gamma}']
                 if method in ('rigbd', 'rigbd_selfloop'):
-                    if getattr(args, 'rigbd_fixed', False):
+                    if getattr(args, 'rigbd_fixed', SETTINGS['rigbd_fixed']):
                         extra = [flag for flag in extra if flag != '--rigbd_grid']
-                    extra += [f"--rigbd_k={getattr(args, 'rigbd_k', 20)}",
-                              f"--rigbd_b={getattr(args, 'rigbd_b', .5)}",
-                              f"--rigbd_selection={getattr(args, 'rigbd_selection', 'label_boundary')}",
-                              f"--rigbd_sampling={getattr(args, 'rigbd_sampling', 'receiver')}",
-                              f"--rigbd_grid_selection={getattr(args, 'rigbd_grid_selection', 'validation')}"]
+                    extra += [f"--rigbd_k={getattr(args, 'rigbd_k', SETTINGS['rigbd_k'])}",
+                              f"--rigbd_b={getattr(args, 'rigbd_b', SETTINGS['rigbd_b'])}",
+                              f"--rigbd_selection={getattr(args, 'rigbd_selection', SETTINGS['rigbd_selection'])}",
+                              f"--rigbd_sampling={getattr(args, 'rigbd_sampling', SETTINGS['rigbd_sampling'])}",
+                              f"--rigbd_grid_selection={getattr(args, 'rigbd_grid_selection', SETTINGS['rigbd_grid_selection'])}"]
                 if method == "abp_sparse":
-                    extra += [f"--abp_sparse_multiplier={getattr(args, 'abp_sparse_multiplier', .95)}",
-                              f"--abp_sparse_strength={getattr(args, 'abp_sparse_strength', .25)}"]
+                    extra += [f"--abp_sparse_multiplier={getattr(args, 'abp_sparse_multiplier', SETTINGS['abp_sparse_multiplier'])}",
+                              f"--abp_sparse_strength={getattr(args, 'abp_sparse_strength', SETTINGS['abp_sparse_strength'])}"]
                 if method == "abp_reference":
                     for key in ('multiplier','ratio','count','risk','members','seed','variant'):
                         value = getattr(args, 'abp_reference_' + key, SETTINGS['abp_reference_' + key])
@@ -148,14 +344,14 @@ def build_jobs(args):
                     for key in ('multiplier','ratio','count','risk','seed','variant'):
                         value=getattr(args,'abp_reference_'+key,SETTINGS['abp_reference_'+key])
                         if value is not None:extra.append(f'--abp_reference_{key}={value}')
-                    extra += [f"--members={getattr(args,'feature_members',1)}",
-                              f"--feature-repair={getattr(args,'feature_repair','unique_mode')}",
-                              f"--feature-tolerance={getattr(args,'feature_tolerance',1e-6)}"]
+                    extra += [f"--members={getattr(args,'feature_members',SETTINGS['feature_members'])}",
+                              f"--feature-repair={getattr(args,'feature_repair',SETTINGS['feature_repair'])}",
+                              f"--feature-tolerance={getattr(args,'feature_tolerance',SETTINGS['feature_tolerance'])}"]
                     if getattr(args,'reference_device',None):extra.append('--device='+args.reference_device)
                 if method == "prune":
-                    extra.append(f"--prune_thr={0.1 if attack == 'SPEAR' else 0.2 if attack == 'UGBA' else 0.8}")
+                    extra.append(f"--prune_thr={PRUNE_SETTINGS[attack]}")
                 if method == 'range_reference':
-                    for key,default in [('gamma',2.),('rho',.2),('alpha',.005)]:
+                    for key,default in [(key, SETTINGS['range_' + key]) for key in ('gamma', 'rho', 'alpha')]:
                         extra.append(f"--range_{key}={getattr(args,'range_'+key,default)}")
                     extra.append('--device='+str(getattr(args,'reference_device',None) or 'cpu'))
                 entry = PROJECT / ('range_reference_launcher.py' if method == 'range_reference' else
@@ -163,10 +359,10 @@ def build_jobs(args):
                     'reference_experiment.py' if method == 'abp_reference' else f"{prefix}{attack}_RIGBD.py")
                 method_common=attack_common
                 if method in ('abp_feature_reference','range_reference'):
-                    method_common=[flag for flag in attack_common if not flag.startswith('--hidden=')]+['--hidden=32']
-                method_lr='--train_lr=0.015' if attack=='DPGBA' and method not in ('abp_feature_reference','range_reference') else '--train_lr=0.01'
+                    method_common=[flag for flag in attack_common if not flag.startswith(
+                        ('--hidden=', '--train_lr=', '--dropout=', '--weight_decay='))]+parameter_flags(REFERENCE_MODEL_SETTINGS)
                 jobs.append((f"{attack}/{method}", entry,
-                             method_common + [method_lr] + inputs + extra
+                             method_common + inputs + extra
                              + [f"--model_save_path={output}"],
                              [output, Path(str(output) + '.meta.json')],
                              [generator, snapshot], output.with_suffix(".log")))
@@ -223,7 +419,7 @@ def write_report(path, args, jobs, records, started, overall):
 
     lines = ["# 攻击与防御实验结果", "", f"- 开始时间：{started}",
              f"- 报告更新时间：{datetime.now().astimezone().isoformat(timespec='seconds')}",
-             f"- 运行状态：{cell(overall)}", f"- 阶段：{args.stage}；数据集：{getattr(args, 'dataset', 'Cora')}；模型：{getattr(args, 'model', 'GCN')}；seed：{args.seed}",
+             f"- 运行状态：{cell(overall)}", f"- 阶段：{args.stage}；数据集：{getattr(args, 'dataset', 'Cora')}；模型：{getattr(args, 'model', 'GCN')}；seed：{args.seed if args.seed is not None else '原版逐算法设置'}",
              f"- Python：`{sys.executable}`；物理 GPU：`{args.gpu}`",
              f"- 攻击目录：`{project_path(args.attack_root)}`",
              f"- 防御目录：`{project_path(args.defense_root)}`", "",
@@ -294,6 +490,10 @@ def run_job(job, env):
     for path in outputs:
         path.parent.mkdir(parents=True, exist_ok=True)
     print(f"\nRunning {name}; log: {log}", flush=True)
+    env = env.copy()
+    for flag in arguments:
+        if flag.startswith('--seed='):
+            env['PYTHONHASHSEED'] = flag.split('=', 1)[1]
     with log.open("w", encoding="utf-8") as stream:
         process = subprocess.Popen([sys.executable, "-u", str(entry), *arguments],
                                    cwd=str(PROJECT), env=env, stdout=subprocess.PIPE,
@@ -322,12 +522,12 @@ def main():
     parser.add_argument("--stage", choices=["attack", "defense", "all"], default=SETTINGS["stage"])
     parser.add_argument("--attacks", nargs="+", choices=list(ATTACK_ARGS), default=SETTINGS["attacks"])
     parser.add_argument("--methods", nargs="+", choices=list(METHOD_ARGS), default=SETTINGS["methods"])
-    parser.add_argument('--rigbd-fixed', action='store_true', help='Use fixed K/b instead of the legacy grid')
-    parser.add_argument('--rigbd-k', type=int, default=20)
-    parser.add_argument('--rigbd-b', type=float, default=.5)
-    parser.add_argument('--rigbd-selection', choices=('label_boundary','losplit','fixed_count'), default='label_boundary')
-    parser.add_argument('--rigbd-sampling', choices=('receiver','legacy_source'), default='receiver')
-    parser.add_argument('--rigbd-grid-selection', choices=('validation','min_asr'), default='validation')
+    parser.add_argument('--rigbd-fixed', action='store_true', default=SETTINGS['rigbd_fixed'], help='Use fixed K/b instead of the legacy grid')
+    parser.add_argument('--rigbd-k', type=int, default=SETTINGS['rigbd_k'])
+    parser.add_argument('--rigbd-b', type=float, default=SETTINGS['rigbd_b'])
+    parser.add_argument('--rigbd-selection', choices=('label_boundary','losplit','fixed_count'), default=SETTINGS['rigbd_selection'])
+    parser.add_argument('--rigbd-sampling', choices=('receiver','legacy_source'), default=SETTINGS['rigbd_sampling'])
+    parser.add_argument('--rigbd-grid-selection', choices=('validation','min_asr'), default=SETTINGS['rigbd_grid_selection'])
     parser.add_argument('--dataset', type=lambda s: {k.lower(): k for k in ('Cora', 'Citeseer', 'Pubmed', 'Physics')}.get(s.lower(), s),
                         choices=['Cora', 'Citeseer', 'Pubmed', 'Physics'], default=SETTINGS['dataset'])
     parser.add_argument('--model', type=lambda s: {k.lower(): k for k in ('GCN', 'GAT', 'GraphSage')}.get(s.lower(), s),
@@ -339,11 +539,11 @@ def main():
         parser.add_argument('--abp-reference-' + key, type=kind, default=SETTINGS['abp_reference_' + key])
     parser.add_argument('--abp-reference-variant', choices=['full','no_reference','full_projection','keep_detected_labels'],
                         default=SETTINGS['abp_reference_variant'])
-    parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--range-gamma',type=float,default=2.)
-    parser.add_argument('--range-rho',type=float,default=.2)
-    parser.add_argument('--range-alpha',type=float,default=.005)
-    parser.add_argument('--reference-device', choices=['cpu','cuda:0'], default=None)
+    parser.add_argument('--epochs', type=int, default=SETTINGS['epochs'], help='Override author training epochs for all algorithms')
+    parser.add_argument('--range-gamma',type=float,default=SETTINGS['range_gamma'])
+    parser.add_argument('--range-rho',type=float,default=SETTINGS['range_rho'])
+    parser.add_argument('--range-alpha',type=float,default=SETTINGS['range_alpha'])
+    parser.add_argument('--reference-device', choices=['cpu','cuda:0'], default=SETTINGS['reference_device'])
     parser.add_argument('--feature-members',type=int,default=SETTINGS['feature_members'])
     parser.add_argument('--feature-repair',choices=['unique_mode','none','clip_normalize'],default=SETTINGS['feature_repair'])
     parser.add_argument('--feature-tolerance',type=float,default=SETTINGS['feature_tolerance'])
@@ -366,7 +566,7 @@ def main():
         parser.error('Sparse multiplier must be finite and positive')
     if not math.isfinite(args.abp_sparse_strength) or args.abp_sparse_strength < 0:
         parser.error('Sparse strength must be finite and nonnegative')
-    if args.epochs < 1 or args.abp_reference_members < 1:
+    if (args.epochs is not None and args.epochs < 1) or args.abp_reference_members < 1:
         parser.error('Epochs and reference members must be positive')
     if not math.isfinite(args.abp_reference_multiplier) or args.abp_reference_multiplier < 1:
         parser.error('Reference multiplier must be finite and at least one')
@@ -376,18 +576,17 @@ def main():
         parser.error('Reference risk must lie strictly between zero and one')
     if args.abp_reference_count is not None and args.abp_reference_count < 1:
         parser.error('Reference count must be positive')
-    for key in ('attack_root', 'defense_root'):
-        setattr(args, key, getattr(args, key).format(dataset=args.dataset, model=args.model, seed=args.seed))
     jobs = build_jobs(args)
     report = project_path(args.report) if args.report else project_path(
-        args.attack_root if args.stage == "attack" else args.defense_root) / "results.md"
+        (args.attack_root if args.stage == "attack" else args.defense_root).format(
+            dataset=args.dataset, model=args.model, seed=args.seed if args.seed is not None else "author")) / "results.md"
     env = os.environ.copy()
     # Keep DPGBA's local modules first while making shared root modules importable.
     env['PYTHONPATH'] = str(PROJECT) + (os.pathsep + env['PYTHONPATH'] if env.get('PYTHONPATH') else '')
-    env.update(CUDA_VISIBLE_DEVICES=str(args.gpu), PYTHONHASHSEED=str(args.seed),
+    env.update(CUDA_VISIBLE_DEVICES=str(args.gpu), PYTHONHASHSEED=next(flag.split('=', 1)[1] for flag in jobs[0][2] if flag.startswith('--seed=')),
                CUBLAS_WORKSPACE_CONFIG=":4096:8", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1",
                MPLBACKEND="Agg", PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
-    print(f"Python: {sys.executable}\nProject: {PROJECT}\nSeed: {args.seed}; physical GPU: {args.gpu}")
+    print(f"Python: {sys.executable}\nProject: {PROJECT}\nSeed override: {args.seed if args.seed is not None else 'author settings'}; physical GPU: {args.gpu}")
     print(f"Markdown report: {report}")
     for name, entry, arguments, outputs, inputs, log in jobs:
         print(f"\n{name}: {[sys.executable, '-u', str(entry), *arguments]}")
